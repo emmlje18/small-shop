@@ -1,6 +1,7 @@
 """SQLite connection and schema setup."""
 
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 
@@ -12,10 +13,21 @@ def connect(database_path):
     return connection
 
 
+@contextmanager
+def database_connection(database_path):
+    """Commit a successful operation and always close its connection."""
+    connection = connect(database_path)
+    try:
+        with connection:
+            yield connection
+    finally:
+        connection.close()
+
+
 def initialize_database(database_path):
     """Create the tables if they are missing, so startup is repeatable."""
     Path(database_path).parent.mkdir(parents=True, exist_ok=True)
-    with connect(database_path) as connection:
+    with database_connection(database_path) as connection:
         connection.executescript(
             """
             CREATE TABLE IF NOT EXISTS products (
