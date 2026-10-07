@@ -65,7 +65,7 @@ This log records meaningful AI assistance used while building the project.
 
 ## 2026-10-07 — Commit 4: Admin catalog pages
 
-- **Commit:** `0066d9d` — Add admin catalog management pages
+- **Commit:** Pending — planned work for admin login and catalog pages
 - **Tool:** ChatGPT (Codex)
 - **Prompt:** Build stage 3: admin login, product listing and
   creation with a first variant, image extension and size validation, and plain
@@ -75,18 +75,17 @@ This log records meaningful AI assistance used while building the project.
   them to the app, added image upload validation, and extended product creation
   to store an optional image path. The provided Dockerfile now copies the
   templates and stylesheet needed by those pages.
-- **How it works (in own words):** The login route compares the
+- **How it works (in own words):** The login compares the
   entered password with `ADMIN_PASSWORD` and stores a signed-in flag in the
   Flask session. `admin_required` checks that flag before showing admin pages.
   The product form converts a price such as `12.50` into integer cents, validates
   stock as a whole nonnegative number, checks an optional image's extension,
   and lets `CatalogService` save the product and its first variant. The catalog
-  page asks the service for products and their variants, then Jinja displays
-  them using the templates.
+  page asks the service for products and their variants and it is displayed.
 
 ## 2026-10-08 — Commit 6: Multiple product options
 
-- **Commit:** `6600c95` — Allow multiple product options in admin form
+- **Commit:** — Allow multiple product options in admin form
 - **Tool:** ChatGPT (Codex)
 - **Prompt:** Extend the admin product form so one product can have as many
   variations as needed, such as different colours of one product. Do not add
@@ -95,9 +94,4 @@ This log records meaningful AI assistance used while building the project.
 - **What changed and why:** The product form can now add and remove option rows.
   The route validates every label and stock value before saving the product and
   all of its variants.
-- **How it works, draft to adapt in my own words:** The repeated form inputs use
-  the same names, so `request.form.getlist()` collects every option label and
-  every stock value. `parse_variants()` matches each label with its stock and
-  validates them before the catalog service saves anything. A small JavaScript
-  file copies a hidden option-row template when I click “Add option”; it also
-  prevents me from removing the last required option row.
+- **How it works (in own words):** The form has several rows that share the same input names, so `request.form.getlist()` gives me all the labels and all the stock values as two lists. `parse_variants()` puts them together and checks each pair, and only if they're all valid does the catalog service save them. The JavaScript just copies a hidden template row when I press "Add option" and prevents deletion of last row.
