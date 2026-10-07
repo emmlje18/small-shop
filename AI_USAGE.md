@@ -84,9 +84,9 @@ This log records meaningful AI assistance used while building the project.
   page asks the service for products and their variants, then Jinja displays
   them using the templates.
 
-## 2026-10-08 — Stage 4 (pending): Multiple product options
+## 2026-10-08 — Commit 6: Multiple product options
 
-- **Commit:** Pending — planned work for multiple option rows in the product form
+- **Commit:** `6600c95` — Allow multiple product options in admin form
 - **Tool:** ChatGPT (Codex)
 - **Prompt:** Extend the admin product form so one product can have as many
   variations as needed, such as different colours of one product. Do not add
