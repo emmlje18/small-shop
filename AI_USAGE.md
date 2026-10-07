@@ -65,7 +65,7 @@ This log records meaningful AI assistance used while building the project.
 
 ## 2026-10-07 — Commit 4: Admin catalog pages
 
-- **Commit:** Pending — planned work for admin login and catalog pages
+- **Commit:** `0066d9d` — Add admin catalog management pages
 - **Tool:** ChatGPT (Codex)
 - **Prompt:** Build stage 3: admin login, product listing and
   creation with a first variant, image extension and size validation, and plain
