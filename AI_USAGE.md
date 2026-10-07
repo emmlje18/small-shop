@@ -43,7 +43,7 @@ This log records meaningful AI assistance used while building the project.
 
 ## 2026-10-07 — Commit 3: Container setup for the revised requirements
 
-- **Commit:** _Add the provided container template and document Docker setup_
+- **Commit:** `864c39f` — Add provided container template and run instructions
 - **Tool:** ChatGPT (Codex)
 - **Prompt:** Compare my project with the updated assignment repository.
   Identify any required changes, and make the necessary updates to my
