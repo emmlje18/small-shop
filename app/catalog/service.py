@@ -9,7 +9,7 @@ class CatalogService:
     def __init__(self, database_path):
         self.database_path = database_path
 
-    def add_product(self, name, description, price_cents):
+    def add_product(self, name, description, price_cents, image_path=None):
         """Validate and save a product with its price in cents."""
         clean_name = name.strip() if isinstance(name, str) else ""
         if not clean_name:
@@ -19,7 +19,11 @@ class CatalogService:
         if not isinstance(description, str):
             raise ValueError("Description must be text.")
         return repository.create_product(
-            self.database_path, clean_name, description.strip(), price_cents
+            self.database_path,
+            clean_name,
+            description.strip(),
+            price_cents,
+            image_path,
         )
 
     def list_products(self):

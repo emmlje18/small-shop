@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Products | Small Shop Admin{% endblock %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <h1>Products</h1>
+      <p>Manage the items and options available in the shop.</p>
+    </div>
+    <a class="button" href="{{ url_for('admin.new_product') }}">Add product</a>
+  </div>
+
+  {% if products %}
+    <div class="product-list">
+      {% for product in products %}
+        <article class="panel product-card">
+          {% if product.image_path %}
+            <img class="product-image" src="{{ url_for('admin.uploaded_file', filename=product.image_path) }}" alt="{{ product.name }}">
+          {% endif %}
+          <div>
+            <h2>{{ product.name }}</h2>
+            <p>{{ product.description }}</p>
+            <p class="price">€{{ "%.2f"|format(product.price_cents / 100) }}</p>
+            <h3>Options and stock</h3>
+            {% if product.variants %}
+              <ul>
+                {% for variant in product.variants %}
+                  <li>{{ variant.option_label }} — {{ variant.stock }} in stock</li>
+                {% endfor %}
+              </ul>
+            {% else %}
+              <p>No options have been added.</p>
+            {% endif %}
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <section class="panel">
+      <h2>No products yet</h2>
+      <p>Add a product and its first option to start filling the catalog.</p>
+    </section>
+  {% endif %}
+{% endblock %}

@@ -17,6 +17,11 @@ SQLite database and upload directory automatically. The database is at
 
 Check that the app is running at <http://127.0.0.1:8000/health>.
 
+The admin catalog pages are at <http://127.0.0.1:8000/admin/login>. The local
+default password is `admin`; set `ADMIN_PASSWORD` before using the admin pages
+outside local development. Product images may be JPG, JPEG, PNG, GIF, or WebP,
+up to 2 MiB per request.
+
 ## Configure the app
 
 | Variable | Default | Purpose |

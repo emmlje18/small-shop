@@ -13,4 +13,5 @@ def get_config():
         "DATA_DIR": data_dir,
         "UPLOAD_DIR": data_dir / "uploads",
         "DATABASE_PATH": data_dir / "shop.db",
+        "MAX_CONTENT_LENGTH": 2 * 1024 * 1024,
     }

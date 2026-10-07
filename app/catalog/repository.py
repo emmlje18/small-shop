@@ -3,13 +3,13 @@
 from app.db import database_connection
 
 
-def create_product(database_path, name, description, price_cents):
+def create_product(database_path, name, description, price_cents, image_path=None):
     """Save one product and return its new database id."""
     with database_connection(database_path) as connection:
         cursor = connection.execute(
-            """INSERT INTO products (name, description, price_cents)
-               VALUES (?, ?, ?)""",
-            (name, description, price_cents),
+            """INSERT INTO products (name, description, price_cents, image_path)
+               VALUES (?, ?, ?, ?)""",
+            (name, description, price_cents, image_path),
         )
         return cursor.lastrowid
 

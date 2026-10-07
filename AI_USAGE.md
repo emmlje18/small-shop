@@ -62,3 +62,24 @@ This log records meaningful AI assistance used while building the project.
   it in a volume so it does not get erased. The copied `container/run.sh` builds
   the image and checks that it starts, responds, honors the port setting, and
   keeps its database under `/data`.
+
+## 2026-10-07 — Commit 4: Admin catalog pages
+
+- **Commit:** Pending — planned work for admin login and catalog pages
+- **Tool:** ChatGPT (Codex)
+- **Prompt:** Build stage 3: admin login, product listing and
+  creation with a first variant, image extension and size validation, and plain
+  templates. Explain each added function so I can understand the code.
+- **Disposition:** Modified
+- **What changed and why:** Added an admin blueprint and templates, connected
+  them to the app, added image upload validation, and extended product creation
+  to store an optional image path. The provided Dockerfile now copies the
+  templates and stylesheet needed by those pages.
+- **How it works (in own words):** The login route compares the
+  entered password with `ADMIN_PASSWORD` and stores a signed-in flag in the
+  Flask session. `admin_required` checks that flag before showing admin pages.
+  The product form converts a price such as `12.50` into integer cents, validates
+  stock as a whole nonnegative number, checks an optional image's extension,
+  and lets `CatalogService` save the product and its first variant. The catalog
+  page asks the service for products and their variants, then Jinja displays
+  them using the templates.

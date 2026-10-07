@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Add product | Small Shop Admin{% endblock %}
+{% block content %}
+  <section class="panel form-panel">
+    <h1>Add a product</h1>
+    <p>Price is entered in euros and stored as integer cents.</p>
+    <form method="post" enctype="multipart/form-data">
+      <label for="name">Product name</label>
+      <input id="name" name="name" type="text" maxlength="120" required>
+
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="4"></textarea>
+
+      <label for="price">Price (€)</label>
+      <input id="price" name="price" type="number" min="0" step="0.01" required>
+
+      <h2>First option</h2>
+      <label for="option_label">Option label</label>
+      <input id="option_label" name="option_label" type="text" placeholder="Blue / Medium" required>
+
+      <label for="stock">Starting stock</label>
+      <input id="stock" name="stock" type="number" min="0" step="1" required>
+
+      <label for="image">Product image (optional)</label>
+      <input id="image" name="image" type="file" accept=".jpg,.jpeg,.png,.gif,.webp">
+      <p class="hint">JPG, PNG, GIF, or WebP; maximum 2 MiB.</p>
+
+      <div class="form-actions">
+        <button type="submit">Save product</button>
+        <a href="{{ url_for('admin.products') }}">Cancel</a>
+      </div>
+    </form>
+  </section>
+{% endblock %}
