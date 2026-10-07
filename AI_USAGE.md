@@ -1,4 +1,64 @@
-| Date/commit | Tool | Prompt | Disposition (Accepted/Modified/Rejected) | What changed & why (if modified) | In my own words, how this works |
-|---|---|---|---|---|---|
-| 2026-10-06 / Create Flask startup skeleton and SQLite schema | ChatGPT (Codex) | Review my Stage 1 plan and implement a Flask app skeleton with environment configuration, startup SQLite schema creation, `/health`, `.gitignore`, and run instructions. | Modified | Implemented the requested startup and schema, with the app also creating `DATA_DIR/uploads` and warning when the default admin password is active. | Draft to rewrite in my own words: `create_app()` reads configuration, creates the data folders, initializes the SQLite tables, and registers `/health`. `app.py` starts Flask on all network interfaces and uses `PORT`, defaulting to 8000. |
-| 2026-10-06 / Create catalog storage and service operations | ChatGPT (Codex) | Implement Stage 2 of the small Flask shop: catalog storage and service logic for products and variants, nonnegative price and stock validation, and the three catalog operations needed by orders. Keep SQL in the catalog repository, preserve the domain seam, and document the catalog design decision. | Modified | The suggested structure was adapted to the existing SQLite schema and connection helper. Catalog operations were grouped in an injected `CatalogService`; database connections now commit successful work and close afterward. | Draft to rewrite in my own words: `CatalogService` checks product prices and variant stock before asking `repository.py` to save them. The repository contains the catalog SQL. For checkout, the service returns a product and price snapshot, conditionally reduces stock only when enough remains, or adds reserved stock back if checkout fails. The order code will use these three service methods instead of querying catalog tables. |
+# AI Usage Log
+
+This log records meaningful AI assistance used while building the project.
+
+## 2026-10-06 — Commit 1: Flask startup and SQLite schema
+
+- **Commit:** `4103ede` — Create Flask startup skeleton and SQLite schema
+- **Tool:** ChatGPT (Codex)
+- **Prompt:** Review and implement my Stage 1 plan: create the app folder
+  structure, configuration, SQLite schema creation at startup, an app entry
+  point that binds to `0.0.0.0` and reads `PORT`, a root `requirements.txt`,
+  `.gitignore`, a minimal README, and a `/health` route. Do not add shop features
+  yet.
+- **Disposition:** Modified
+- **What changed and why:** The requested startup and schema were implemented.
+  The app also creates `DATA_DIR/uploads` automatically and warns when the
+  default admin password is active.
+- **How it works (in own words):** `app.py` calls `create_app()` to build the
+  Flask application, then starts it on host server `0.0.0.0` and port `8000` by default. `create_app()` reads settings from the environment, creates the data and upload folders,
+  initializes the SQLite tables, and registers `/health` so I can
+  check that the web app responds.
+
+## 2026-10-06 — Commit 2: Catalog storage and service operations
+
+- **Commit:** `e8ef8d5` — Add catalog storage and service operations
+- **Tool:** ChatGPT (Codex)
+- **Prompt:** Implement Stage 2 of the Flask shop: catalog storage and service
+  logic for products and variants, nonnegative price and stock validation, and
+  the three catalog operations orders will need. Keep SQL in the catalog
+  repository, preserve the domain seam, and record the catalog design decision.
+- **Disposition:** Modified
+- **What changed and why:** The catalog service was adapted to the existing
+  SQLite schema and connection helper. Product and variant operations are
+  grouped in `CatalogService`, which can be injected into the future order
+  service. Database connections now close after each operation.
+- **How it works (in own words):** `CatalogService` checks product names, prices, option labels, and stock before
+  saving them. It calls `repository.py`, where SQL creates and lists products and
+  variants. For checkout, `get_variant_snapshot()` returns the product name,
+  option, price, and stock; `decrement_stock()` runs one conditional update so it
+  cannot reduce stock below zero; and `restore_stock()` adds reserved units back.
+  Each repository operation commits its own database work and closes its SQLite
+  connection.
+
+## 2026-10-07 — Commit 3: Container setup for the revised requirements
+
+- **Commit:** _Add the provided container template and document Docker setup_
+- **Tool:** ChatGPT (Codex)
+- **Prompt:** Compare my project with the updated assignment repository.
+  Identify any required changes, and make the necessary updates to my
+  individual project.
+- **Disposition:** Modified
+- **What changed and why:** The revised brief requires using the provided
+  Dockerfile template. I copied that template to the project root and copied the
+  provided checker and its instructions into `container/`. I changed only the
+  source-copy TODO so the image includes the `app/` package, pinned Flask, and
+  documented direct and container run commands and environment defaults.
+- **How it works (in own words):** The Dockerfile tells Docker
+  to start with a small Python image, install the exact Flask version from
+  `requirements.txt`, and copy `app.py` and the `app/` folder into the image.
+  When the container starts, `CMD` runs `python app.py`. The app listens on the
+  configured port and puts its SQLite file under `/data`, where Docker can keep
+  it in a volume so it does not get erased. The copied `container/run.sh` builds
+  the image and checks that it starts, responds, honors the port setting, and
+  keeps its database under `/data`.
