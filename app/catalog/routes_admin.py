@@ -68,6 +68,26 @@ def parse_nonnegative_integer(value, field_name):
     return number
 
 
+def parse_variants(option_labels, stock_values):
+    """Validate matching option and stock fields from the product form."""
+    if len(option_labels) != len(stock_values):
+        raise ValueError("Each option needs a matching stock value.")
+
+    variants = []
+    for position, (option_label, stock_value) in enumerate(
+        zip(option_labels, stock_values), start=1
+    ):
+        clean_label = option_label.strip()
+        if not clean_label:
+            raise ValueError(f"Option {position} needs a label.")
+        stock = parse_nonnegative_integer(stock_value, f"Stock for option {position}")
+        variants.append({"option_label": clean_label, "stock": stock})
+
+    if not variants:
+        raise ValueError("Add at least one option.")
+    return variants
+
+
 def save_uploaded_image(upload, upload_directory):
     """Save an optional image with a safe unique filename."""
     if upload is None or not upload.filename:
@@ -131,21 +151,18 @@ def products():
 @admin_blueprint.route("/products/new", methods=["GET", "POST"])
 @admin_required
 def new_product():
-    """Validate and save a product, its first variant, and an optional image."""
+    """Validate and save a product, its options, and an optional image."""
     if request.method == "POST":
         name = request.form.get("name", "")
         description = request.form.get("description", "")
-        option_label = request.form.get("option_label", "")
         image_path = None
 
         try:
             price_cents = parse_price_cents(request.form.get("price", ""))
-            stock = parse_nonnegative_integer(
-                request.form.get("stock", ""), "Stock"
+            variants = parse_variants(
+                request.form.getlist("option_label"),
+                request.form.getlist("stock"),
             )
-            if not option_label.strip():
-                raise ValueError("Variant option is required.")
-
             image_path = save_uploaded_image(
                 request.files.get("image"), current_app.config["UPLOAD_DIR"]
             )
@@ -153,7 +170,10 @@ def new_product():
             product_id = catalog.add_product(
                 name, description, price_cents, image_path
             )
-            catalog.add_variant(product_id, option_label, stock)
+            for variant in variants:
+                catalog.add_variant(
+                    product_id, variant["option_label"], variant["stock"]
+                )
         except ValueError as error:
             if image_path:
                 (Path(current_app.config["UPLOAD_DIR"]) / image_path).unlink(

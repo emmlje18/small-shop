@@ -83,3 +83,21 @@ This log records meaningful AI assistance used while building the project.
   and lets `CatalogService` save the product and its first variant. The catalog
   page asks the service for products and their variants, then Jinja displays
   them using the templates.
+
+## 2026-10-08 — Stage 4 (pending): Multiple product options
+
+- **Commit:** Pending — planned work for multiple option rows in the product form
+- **Tool:** ChatGPT (Codex)
+- **Prompt:** Extend the admin product form so one product can have as many
+  variations as needed, such as different colours of one product. Do not add
+  the example product as shop data.
+- **Disposition:** Modified
+- **What changed and why:** The product form can now add and remove option rows.
+  The route validates every label and stock value before saving the product and
+  all of its variants.
+- **How it works, draft to adapt in my own words:** The repeated form inputs use
+  the same names, so `request.form.getlist()` collects every option label and
+  every stock value. `parse_variants()` matches each label with its stock and
+  validates them before the catalog service saves anything. A small JavaScript
+  file copies a hidden option-row template when I click “Add option”; it also
+  prevents me from removing the last required option row.

@@ -14,12 +14,27 @@
       <label for="price">Price (€)</label>
       <input id="price" name="price" type="number" min="0" step="0.01" required>
 
-      <h2>First option</h2>
-      <label for="option_label">Option label</label>
-      <input id="option_label" name="option_label" type="text" placeholder="Blue / Medium" required>
+      <div class="variants-heading">
+        <div>
+          <h2>Options and stock</h2>
+          <p class="hint">Add one row for every choice the customer can make.</p>
+        </div>
+        <button class="secondary-button" id="add-option" type="button">Add option</button>
+      </div>
 
-      <label for="stock">Starting stock</label>
-      <input id="stock" name="stock" type="number" min="0" step="1" required>
+      <div id="option-rows">
+        <div class="option-row">
+          <div>
+            <label>Option label</label>
+            <input name="option_label" type="text" placeholder="Colour: Blue" required>
+          </div>
+          <div>
+            <label>Stock</label>
+            <input name="stock" type="number" min="0" step="1" required>
+          </div>
+          <button class="remove-option" type="button" aria-label="Remove option">Remove</button>
+        </div>
+      </div>
 
       <label for="image">Product image (optional)</label>
       <input id="image" name="image" type="file" accept=".jpg,.jpeg,.png,.gif,.webp">
@@ -31,4 +46,18 @@
       </div>
     </form>
   </section>
+  <template id="option-row-template">
+    <div class="option-row">
+      <div>
+        <label>Option label</label>
+        <input name="option_label" type="text" placeholder="Colour: Blue" required>
+      </div>
+      <div>
+        <label>Stock</label>
+        <input name="stock" type="number" min="0" step="1" required>
+      </div>
+      <button class="remove-option" type="button" aria-label="Remove option">Remove</button>
+    </div>
+  </template>
+  <script src="{{ url_for('static', filename='product_options.js') }}"></script>
 {% endblock %}

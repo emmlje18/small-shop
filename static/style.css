@@ -35,6 +35,12 @@ button, .button { display: inline-block; margin-top: 1rem; padding: 0.7rem 1rem;
 .link-button { margin: 0; padding: 0; background: transparent; text-decoration: underline; }
 .form-actions { display: flex; align-items: center; gap: 1rem; }
 .hint { margin: 0.35rem 0; color: #5c665d; font-size: 0.9rem; }
+.variants-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; }
+.variants-heading h2 { margin-bottom: 0; }
+.secondary-button { background: #586958; }
+.option-row { display: grid; grid-template-columns: 1fr 130px auto; align-items: end; gap: 0.75rem; margin: 0.75rem 0; }
+.option-row button { margin-top: 0; }
+.remove-option:disabled { cursor: not-allowed; opacity: 0.5; }
 .message { padding: 0.75rem 1rem; border-radius: 5px; }
 .message.error { color: #7a1c1c; background: #fce8e8; }
 .message.success { color: #205535; background: #e3f4e8; }
@@ -42,4 +48,5 @@ button, .button { display: inline-block; margin-top: 1rem; padding: 0.7rem 1rem;
 @media (max-width: 560px) {
   .page-heading { align-items: flex-start; flex-direction: column; }
   .product-card { grid-template-columns: 1fr; }
+  .option-row { grid-template-columns: 1fr; }
 }
