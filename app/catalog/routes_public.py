@@ -30,7 +30,10 @@ def product_detail(product_id):
 
     variants = catalog.list_variants(product_id)
     return render_template(
-        "shop/product_detail.html", product=product, variants=variants
+        "shop/product_detail.html",
+        product=product,
+        variants=variants,
+        has_available_variants=any(variant["stock"] > 0 for variant in variants),
     )
 
 
@@ -38,3 +41,12 @@ def product_detail(product_id):
 def uploaded_file(filename):
     """Send a catalog image to a customer browser."""
     return send_from_directory(current_app.config["UPLOAD_DIR"], filename)
+
+
+@catalog_blueprint.get("/variant-images/<int:variant_id>")
+def variant_image(variant_id):
+    """Send an option's product image, or a placeholder when it has none."""
+    image_path = _catalog_service().get_variant_image_path(variant_id)
+    if image_path:
+        return send_from_directory(current_app.config["UPLOAD_DIR"], image_path)
+    return send_from_directory(current_app.static_folder, "product-placeholder.svg")

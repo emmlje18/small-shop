@@ -9,9 +9,12 @@
 <body>
   <header class="topbar">
     <a href="{{ url_for('catalog.product_list') }}">Small Shop</a>
-    <a class="topbar-link" href="{{ url_for('admin.login') }}">Admin</a>
+    <nav class="shop-navigation">
+      <a class="topbar-link" href="{{ url_for('shop.cart') }}">Cart ({{ session.get('cart', [])|length }})</a>
+      <a class="topbar-link" href="{{ url_for('admin.login') }}">Admin</a>
+    </nav>
   </header>
-  <main class="page">
+  <main class="page shop-page">
     {% block content %}{% endblock %}
   </main>
 </body>

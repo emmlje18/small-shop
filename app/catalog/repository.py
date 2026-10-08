@@ -74,6 +74,19 @@ def get_variant_snapshot(database_path, variant_id):
         return dict(row) if row is not None else None
 
 
+def get_variant_image_path(database_path, variant_id):
+    """Return the main image path for one active product option."""
+    with database_connection(database_path) as connection:
+        row = connection.execute(
+            """SELECT p.image_path
+               FROM product_variants AS v
+               JOIN products AS p ON p.id = v.product_id
+               WHERE v.id = ? AND p.is_active = 1""",
+            (variant_id,),
+        ).fetchone()
+        return row["image_path"] if row is not None else None
+
+
 def decrement_stock(database_path, variant_id, quantity):
     """Reduce stock only when enough units remain."""
     with database_connection(database_path) as connection:

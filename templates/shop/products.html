@@ -21,7 +21,7 @@
             <h2>{{ product.name }}</h2>
             <p>{{ product.description }}</p>
             <p class="price">€{{ "%.2f"|format(product.price_cents / 100) }}</p>
-            <a class="button" href="{{ url_for('catalog.product_detail', product_id=product.id) }}">View product</a>
+            <a class="text-link" href="{{ url_for('catalog.product_detail', product_id=product.id) }}">View options</a>
           </div>
         </article>
       {% endfor %}

@@ -6,6 +6,7 @@ from app.config import get_config
 from app.db import initialize_database
 from app.catalog.routes_admin import admin_blueprint
 from app.catalog.routes_public import catalog_blueprint
+from app.orders.routes_shop import shop_blueprint
 
 
 def create_app():
@@ -25,6 +26,7 @@ def create_app():
     initialize_database(app.config["DATABASE_PATH"])
     app.register_blueprint(admin_blueprint)
     app.register_blueprint(catalog_blueprint)
+    app.register_blueprint(shop_blueprint)
 
     @app.get("/health")
     def health():

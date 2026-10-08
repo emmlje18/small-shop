@@ -57,6 +57,12 @@ class CatalogService:
         """Return the stable catalog details an order must copy."""
         return repository.get_variant_snapshot(self.database_path, variant_id)
 
+    def get_variant_image_path(self, variant_id):
+        """Return the main image path for a public catalog option image."""
+        if not self._is_positive_integer(variant_id):
+            return None
+        return repository.get_variant_image_path(self.database_path, variant_id)
+
     def decrement_stock(self, variant_id, quantity):
         """Atomically reserve stock if the requested quantity is available."""
         if not self._is_positive_integer(variant_id):

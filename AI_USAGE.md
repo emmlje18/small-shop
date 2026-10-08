@@ -108,3 +108,20 @@ This log records meaningful AI assistance used while building the project.
   catalog repository can now read one active product by id, and the customer
   pages display active products and their in-stock options.
 - **How it works (in own words):** `product_list()` fetches all active products from `CatalogService` and passes them to the home page template. `product_detail()` fetches one product with its variants, and returns a 404 error page if the product doesn’t exist or is inactive. In the variant dropdown, each option’s value is the variant id, and its text shows the option label and remaining stock. These storefront routes live in the catalog domain because they only read catalog data, so the future orders service still depends only on the three seam functions (`get_variant_snapshot`,   `decrement_stock`, `restore_stock`)
+
+## 2026-10-09 — Session-based shopping cart
+
+- **Commit:** Add session-based shopping cart
+- **Tool:** ChatGPT (Codex)
+- **Prompt:** Build the cart as the first orders-domain feature. Store it in the
+  Flask session, merge duplicate options, show totals and current stock, and
+  keep checkout, payment, order creation, and stock changes for a later stage.
+  Explain the code simply after implementation.
+- **Disposition:** Modified
+- **What changed and why:** Added `OrderService` cart operations, customer cart
+  routes, an add-to-cart form, a cart page, and quantity-update and remove
+  controls. The service receives a catalog object, so it uses the defined
+  catalog seam instead of accessing catalog SQL or tables itself.
+- **How it works (in own words):** The Flask session stores the cart as a list like `[{"variant_id": 4, "qty": 2}]`. `add_to_cart()` first asks the injected catalog service for a current snapshot through the seam function `get_variant_snapshot(variant_id)`, then copies the list and looks for a line with the same `variant_id`. If it finds one, it adds to that line’s quantity, otherwise, it appends a new line. It refuses the change if the resulting quantity is more than the current stock.
+
+`cart_summary()` looks up a fresh snapshot for each cart line, so the displayed price and stock use current catalog data, and it totals prices in cents. If an option no longer exists, it is skipped from the displayed summary. The routes call these methods and store the returned cart list back in the session.

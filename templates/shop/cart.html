@@ -1,0 +1,60 @@
+{% extends "shop_base.html" %}
+{% block title %}Cart | Small Shop{% endblock %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <h1>Your cart</h1>
+      <p>Review your selected product options.</p>
+    </div>
+    <a class="button" href="{{ url_for('catalog.product_list') }}">Continue shopping</a>
+  </div>
+
+  {% if cart["items"] %}
+    <div class="cart-layout">
+      <section class="cart-list">
+        {% for item in cart["items"] %}
+          <article class="cart-line">
+            <img class="cart-image" src="{{ url_for('catalog.variant_image', variant_id=item.variant_id) }}" alt="{{ item.product_name }}">
+            <div class="cart-line-details">
+              <h2>{{ item.product_name }}</h2>
+              <p>{{ item.option_label }}</p>
+              <p>€{{ "%.2f"|format(item.unit_price_cents / 100) }} each</p>
+              {% if not item.has_enough_stock %}
+                <p class="message error">Only {{ item.stock }} currently available.</p>
+              {% endif %}
+              <p class="line-subtotal">Subtotal: €{{ "%.2f"|format(item.line_total_cents / 100) }}</p>
+            </div>
+            <div class="cart-line-actions">
+              <form method="post" action="{{ url_for('shop.update_cart_item', variant_id=item.variant_id) }}">
+                <label for="quantity-{{ item.variant_id }}">Quantity</label>
+                <input id="quantity-{{ item.variant_id }}" name="quantity" type="number" min="0" value="{{ item.quantity }}" required>
+                <button type="submit">Update</button>
+              </form>
+              <form method="post" action="{{ url_for('shop.remove_cart_item', variant_id=item.variant_id) }}">
+                <button class="text-button" type="submit">Remove</button>
+              </form>
+            </div>
+          </article>
+        {% endfor %}
+      </section>
+      <aside class="cart-summary">
+        <h2>Order summary</h2>
+        <div class="summary-row">
+          <span>Order total</span>
+          <span>€{{ "%.2f"|format(cart["total_cents"] / 100) }}</span>
+        </div>
+        <div class="summary-total">
+          <span>Total</span>
+          <strong>€{{ "%.2f"|format(cart["total_cents"] / 100) }}</strong>
+        </div>
+        <p class="hint">Checkout is added in the next stage.</p>
+        <button type="button" disabled>Continue to checkout</button>
+      </aside>
+    </div>
+  {% else %}
+    <section class="panel">
+      <h2>Your cart is empty</h2>
+      <p>Add an option from a product page to see it here.</p>
+    </section>
+  {% endif %}
+{% endblock %}
