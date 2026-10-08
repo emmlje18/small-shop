@@ -25,6 +25,18 @@ def list_products(database_path):
         return [dict(row) for row in rows]
 
 
+def get_product(database_path, product_id):
+    """Return one active product for the public catalog, or None."""
+    with database_connection(database_path) as connection:
+        row = connection.execute(
+            """SELECT id, name, description, price_cents, image_path,
+                      is_active, created_at
+               FROM products WHERE id = ? AND is_active = 1""",
+            (product_id,),
+        ).fetchone()
+        return dict(row) if row is not None else None
+
+
 def create_variant(database_path, product_id, option_label, stock):
     """Save one product option and return its new database id."""
     with database_connection(database_path) as connection:

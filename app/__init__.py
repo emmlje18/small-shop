@@ -5,6 +5,7 @@ from flask import Flask, jsonify
 from app.config import get_config
 from app.db import initialize_database
 from app.catalog.routes_admin import admin_blueprint
+from app.catalog.routes_public import catalog_blueprint
 
 
 def create_app():
@@ -23,6 +24,7 @@ def create_app():
     app.config["UPLOAD_DIR"].mkdir(parents=True, exist_ok=True)
     initialize_database(app.config["DATABASE_PATH"])
     app.register_blueprint(admin_blueprint)
+    app.register_blueprint(catalog_blueprint)
 
     @app.get("/health")
     def health():

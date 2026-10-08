@@ -1,0 +1,9 @@
+{% extends "shop_base.html" %}
+{% block title %}Product not found | Small Shop{% endblock %}
+{% block content %}
+  <section class="panel">
+    <h1>Product not found</h1>
+    <p>This product is unavailable or no longer active.</p>
+    <a class="button" href="{{ url_for('catalog.product_list') }}">Browse products</a>
+  </section>
+{% endblock %}

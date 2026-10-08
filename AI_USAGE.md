@@ -95,3 +95,16 @@ This log records meaningful AI assistance used while building the project.
   The route validates every label and stock value before saving the product and
   all of its variants.
 - **How it works (in own words):** The form has several rows that share the same input names, so `request.form.getlist()` gives me all the labels and all the stock values as two lists. `parse_variants()` puts them together and checks each pair, and only if they're all valid does the catalog service save them. The JavaScript just copies a hidden template row when I press "Add option" and prevents deletion of last row.
+
+## 2026-10-08 — Customer catalog pages
+
+- **Commit:** Add customer product catalog pages
+- **Tool:** ChatGPT (Codex)
+- **Prompt:** Build customer catalog browsing with a home page, product-detail
+  pages, product images, and an option dropdown. Keep cart and checkout for a
+  later stage and keep the application within the assignment architecture.
+- **Disposition:** Modified
+- **What changed and why:** Added public catalog routes and templates. The
+  catalog repository can now read one active product by id, and the customer
+  pages display active products and their in-stock options.
+- **How it works (in own words):** `product_list()` fetches all active products from `CatalogService` and passes them to the home page template. `product_detail()` fetches one product with its variants, and returns a 404 error page if the product doesn’t exist or is inactive. In the variant dropdown, each option’s value is the variant id, and its text shows the option label and remaining stock. These storefront routes live in the catalog domain because they only read catalog data, so the future orders service still depends only on the three seam functions (`get_variant_snapshot`,   `decrement_stock`, `restore_stock`)

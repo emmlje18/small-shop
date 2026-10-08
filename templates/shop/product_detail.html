@@ -1,0 +1,29 @@
+{% extends "shop_base.html" %}
+{% block title %}{{ product.name }} | Small Shop{% endblock %}
+{% block content %}
+  <a class="back-link" href="{{ url_for('catalog.product_list') }}">← Back to products</a>
+  <article class="product-detail">
+    {% if product.image_path %}
+      <img class="detail-image" src="{{ url_for('catalog.uploaded_file', filename=product.image_path) }}" alt="{{ product.name }}">
+    {% else %}
+      <div class="detail-image image-placeholder" aria-hidden="true">No image</div>
+    {% endif %}
+    <div>
+      <h1>{{ product.name }}</h1>
+      <p>{{ product.description }}</p>
+      <p class="price">€{{ "%.2f"|format(product.price_cents / 100) }}</p>
+
+      <label for="variant">Choose an option</label>
+      <select id="variant" name="variant" {% if not variants %}disabled{% endif %}>
+        {% for variant in variants %}
+          <option value="{{ variant.id }}" {% if variant.stock == 0 %}disabled{% endif %}>
+            {{ variant.option_label }} — {{ variant.stock }} in stock
+          </option>
+        {% else %}
+          <option>No options available</option>
+        {% endfor %}
+      </select>
+      <p class="hint">Adding this option to a cart comes in the next stage.</p>
+    </div>
+  </article>
+{% endblock %}

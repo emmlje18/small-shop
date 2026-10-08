@@ -1,0 +1,35 @@
+{% extends "shop_base.html" %}
+{% block title %}Small Shop{% endblock %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <h1>Small Shop</h1>
+      <p>Browse the available products and choose an option.</p>
+    </div>
+  </div>
+
+  {% if products %}
+    <div class="store-grid">
+      {% for product in products %}
+        <article class="store-card">
+          {% if product.image_path %}
+            <img class="store-image" src="{{ url_for('catalog.uploaded_file', filename=product.image_path) }}" alt="{{ product.name }}">
+          {% else %}
+            <div class="image-placeholder" aria-hidden="true">No image</div>
+          {% endif %}
+          <div class="store-card-content">
+            <h2>{{ product.name }}</h2>
+            <p>{{ product.description }}</p>
+            <p class="price">€{{ "%.2f"|format(product.price_cents / 100) }}</p>
+            <a class="button" href="{{ url_for('catalog.product_detail', product_id=product.id) }}">View product</a>
+          </div>
+        </article>
+      {% endfor %}
+    </div>
+  {% else %}
+    <section class="panel">
+      <h1>Products are coming soon</h1>
+      <p>There are no products available yet.</p>
+    </section>
+  {% endif %}
+{% endblock %}

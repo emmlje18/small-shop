@@ -30,6 +30,12 @@ class CatalogService:
         """List active products for the storefront."""
         return repository.list_products(self.database_path)
 
+    def get_product(self, product_id):
+        """Return one active product for a public product page."""
+        if not self._is_positive_integer(product_id):
+            return None
+        return repository.get_product(self.database_path, product_id)
+
     def add_variant(self, product_id, option_label, stock):
         """Validate and save a stock option for an existing product."""
         clean_label = option_label.strip() if isinstance(option_label, str) else ""

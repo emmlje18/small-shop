@@ -18,6 +18,7 @@ body { margin: 0; }
 }
 
 .topbar a { color: white; font-weight: 700; text-decoration: none; }
+.topbar-link { font-weight: 500 !important; text-decoration: underline !important; }
 .topbar form { margin: 0; }
 .page { width: min(900px, calc(100% - 2rem)); margin: 2rem auto; }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
@@ -27,6 +28,16 @@ body { margin: 0; }
 .product-list { display: grid; gap: 1rem; }
 .product-card { display: grid; grid-template-columns: 150px 1fr; gap: 1.25rem; }
 .product-image { width: 150px; height: 150px; border-radius: 6px; object-fit: cover; }
+.store-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.25rem; }
+.store-card { overflow: hidden; border: 1px solid #dce1d9; border-radius: 10px; background: white; }
+.store-card-content { padding: 1.25rem; }
+.store-card-content h2 { margin-top: 0; }
+.store-image, .detail-image { width: 100%; aspect-ratio: 1; object-fit: cover; background: #e8ece7; }
+.image-placeholder { display: grid; min-height: 150px; place-items: center; color: #5c665d; background: #e8ece7; }
+.product-detail { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(260px, 1fr); gap: 2rem; padding: 1.5rem; border: 1px solid #dce1d9; border-radius: 10px; background: white; }
+.product-detail label { display: block; margin: 1rem 0 0.35rem; font-weight: 600; }
+.product-detail select { width: 100%; padding: 0.7rem; border: 1px solid #aeb8ad; border-radius: 5px; font: inherit; }
+.back-link { display: inline-block; margin-bottom: 1rem; color: #29483b; }
 .price { font-size: 1.1rem; font-weight: 700; }
 
 form label { display: block; margin: 1rem 0 0.35rem; font-weight: 600; }
@@ -48,5 +59,6 @@ button, .button { display: inline-block; margin-top: 1rem; padding: 0.7rem 1rem;
 @media (max-width: 560px) {
   .page-heading { align-items: flex-start; flex-direction: column; }
   .product-card { grid-template-columns: 1fr; }
+  .product-detail { grid-template-columns: 1fr; }
   .option-row { grid-template-columns: 1fr; }
 }
