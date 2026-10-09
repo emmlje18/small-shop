@@ -1,12 +1,15 @@
-"""Cart operations and later checkout and order status operations."""
+"""Cart, checkout, and order status operations."""
+
+from app.orders import repository
 
 
 class OrderService:
     """Apply cart rules while receiving catalog data through the domain seam."""
 
-    def __init__(self, catalog, payment_provider=None):
+    def __init__(self, catalog, payment_provider=None, database_path=None):
         self.catalog = catalog
         self.payment_provider = payment_provider
+        self.database_path = database_path
 
     def add_to_cart(self, cart, variant_id, quantity):
         """Add units to a cart, merging a line for the same product option."""
@@ -72,12 +75,113 @@ class OrderService:
 
         return {"items": items, "total_cents": total_cents}
 
+    def checkout(self, cart, customer_name, customer_email, card_number):
+        """Create, charge, and finish one order while handling stock safely."""
+        self._require_checkout_dependencies()
+        clean_name = self._clean_customer_name(customer_name)
+        clean_email = self._clean_customer_email(customer_email)
+        items = self._checkout_items(cart)
+        total_cents = sum(item["unit_price_cents"] * item["quantity"] for item in items)
+
+        decremented_lines = []
+        for item in items:
+            if not self.catalog.decrement_stock(item["variant_id"], item["quantity"]):
+                self._restore_lines(decremented_lines)
+                raise ValueError("An item sold out before checkout. Your cart was not charged.")
+            decremented_lines.append(item)
+
+        try:
+            order_id = repository.create_pending_order(
+                self.database_path, clean_name, clean_email, total_cents, items
+            )
+        except Exception:
+            self._restore_lines(decremented_lines)
+            raise
+
+        payment_ref = self.payment_provider.charge(total_cents, card_number)
+        if payment_ref:
+            repository.update_order_status(
+                self.database_path, order_id, "paid", ("pending",), payment_ref
+            )
+            return {"success": True, "order_id": order_id}
+
+        self.cancel_order(order_id)
+        return {"success": False, "order_id": order_id}
+
+    def cancel_order(self, order_id):
+        """Cancel a pending or paid order and return its items to stock."""
+        self._require_database_path()
+        self._validate_positive_integer(order_id, "Order id")
+        changed = repository.update_order_status(
+            self.database_path, order_id, "cancelled", ("pending", "paid")
+        )
+        if not changed:
+            raise ValueError("This order cannot be cancelled.")
+
+        self._restore_lines(repository.get_order_items(self.database_path, order_id))
+
+    def mark_shipped(self, order_id):
+        """Mark a paid order as shipped; other status changes are refused."""
+        self._require_database_path()
+        self._validate_positive_integer(order_id, "Order id")
+        changed = repository.update_order_status(
+            self.database_path, order_id, "shipped", ("paid",)
+        )
+        if not changed:
+            raise ValueError("Only a paid order can be marked as shipped.")
+
     def _get_available_snapshot(self, variant_id):
         """Find an active option or explain why it cannot enter the cart."""
         snapshot = self.catalog.get_variant_snapshot(variant_id)
         if snapshot is None:
             raise ValueError("This product option is no longer available.")
         return snapshot
+
+    def _checkout_items(self, cart):
+        """Take fresh snapshots so an order never trusts old session prices."""
+        cart_lines = self._copy_cart(cart)
+        if not cart_lines:
+            raise ValueError("Your cart is empty.")
+
+        items = []
+        for line in cart_lines:
+            self._validate_positive_integer(line["variant_id"], "Variant id")
+            self._validate_positive_integer(line["qty"], "Quantity")
+            snapshot = self._get_available_snapshot(line["variant_id"])
+            items.append({**snapshot, "quantity": line["qty"]})
+        return items
+
+    def _restore_lines(self, lines):
+        """Return every listed quantity to catalog stock after a failed checkout."""
+        for line in lines:
+            self.catalog.restore_stock(line["variant_id"], line["quantity"])
+
+    def _require_checkout_dependencies(self):
+        """Ensure checkout has the injected collaborators it needs."""
+        self._require_database_path()
+        if self.payment_provider is None:
+            raise RuntimeError("A payment provider is required for checkout.")
+
+    def _require_database_path(self):
+        """Keep cart-only tests independent from the SQLite order repository."""
+        if self.database_path is None:
+            raise RuntimeError("A database path is required for order operations.")
+
+    @staticmethod
+    def _clean_customer_name(value):
+        """Require a readable guest name for the saved order."""
+        clean_value = value.strip() if isinstance(value, str) else ""
+        if not clean_value:
+            raise ValueError("Your name is required.")
+        return clean_value
+
+    @staticmethod
+    def _clean_customer_email(value):
+        """Perform a small check before storing the guest email address."""
+        clean_value = value.strip() if isinstance(value, str) else ""
+        if "@" not in clean_value or clean_value.startswith("@"):
+            raise ValueError("Enter a valid email address.")
+        return clean_value
 
     @staticmethod
     def _check_stock(snapshot, quantity):

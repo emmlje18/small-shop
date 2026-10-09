@@ -1,0 +1,12 @@
+{% extends "shop_base.html" %}
+{% block title %}Order placed | Small Shop{% endblock %}
+{% block content %}
+  <section class="panel confirmation-panel">
+    <h1>Order placed</h1>
+    <p>Thank you, {{ order.customer_name }}. Your fake payment was successful.</p>
+    <p><strong>Order number:</strong> {{ order.id }}</p>
+    <p><strong>Payment reference:</strong> {{ order.payment_ref }}</p>
+    <p><strong>Total:</strong> €{{ "%.2f"|format(order.total_cents / 100) }}</p>
+    <a class="button" href="{{ url_for('catalog.product_list') }}">Continue shopping</a>
+  </section>
+{% endblock %}

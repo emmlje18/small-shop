@@ -47,8 +47,7 @@
           <span>Total</span>
           <strong>€{{ "%.2f"|format(cart["total_cents"] / 100) }}</strong>
         </div>
-        <p class="hint">Checkout is added in the next stage.</p>
-        <button type="button" disabled>Continue to checkout</button>
+        <a class="button checkout-button" href="{{ url_for('shop.checkout') }}">Continue to checkout</a>
       </aside>
     </div>
   {% else %}

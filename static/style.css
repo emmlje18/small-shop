@@ -59,6 +59,11 @@ body { margin: 0; }
 .summary-total { font-size: 1.15rem; }
 .cart-summary button { width: 100%; }
 .cart-summary button:disabled { cursor: not-allowed; opacity: 0.55; }
+.checkout-button { width: 100%; text-align: center; }
+.checkout-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; align-items: start; gap: 2rem; }
+.checkout-form { margin: 0; }
+.checkout-form h2:first-child { margin-top: 0; }
+.confirmation-panel { max-width: 620px; margin: 4rem auto; }
 .back-link { display: inline-block; margin-bottom: 1rem; color: #29483b; }
 .price { font-size: 1.1rem; font-weight: 700; }
 .text-link, .text-button { color: #29483b; background: transparent; border: 0; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
@@ -87,6 +92,7 @@ button, .button { display: inline-block; margin-top: 1rem; padding: 0.7rem 1rem;
   .option-row { grid-template-columns: 1fr; }
   .store-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.75rem; }
   .cart-layout { grid-template-columns: 1fr; }
+  .checkout-layout { grid-template-columns: 1fr; }
   .cart-line { grid-template-columns: 90px minmax(0, 1fr); }
   .cart-line .cart-image { width: 90px; height: 112px; }
   .cart-line-actions { grid-column: 2; }
@@ -95,4 +101,5 @@ button, .button { display: inline-block; margin-top: 1rem; padding: 0.7rem 1rem;
 @media (min-width: 561px) and (max-width: 850px) {
   .store-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .cart-layout { grid-template-columns: 1fr; }
+  .checkout-layout { grid-template-columns: 1fr; }
 }

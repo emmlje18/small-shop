@@ -12,6 +12,8 @@ from flask import (
 )
 
 from app.catalog.service import CatalogService
+from app.orders.payment import FakePaymentProvider
+from app.orders import repository
 from app.orders.service import OrderService
 
 
@@ -21,7 +23,8 @@ shop_blueprint = Blueprint("shop", __name__)
 def _order_service():
     """Create an order service with the catalog seam injected into it."""
     catalog = CatalogService(current_app.config["DATABASE_PATH"])
-    return OrderService(catalog)
+    payment_provider = FakePaymentProvider()
+    return OrderService(catalog, payment_provider, current_app.config["DATABASE_PATH"])
 
 
 def _cart():
@@ -65,6 +68,47 @@ def cart():
     """Show the selected options, current prices, and cart total."""
     summary = _order_service().cart_summary(_cart())
     return render_template("shop/cart.html", cart=summary)
+
+
+@shop_blueprint.route("/checkout", methods=["GET", "POST"])
+def checkout():
+    """Show the guest checkout form and submit one order."""
+    order_service = _order_service()
+    summary = order_service.cart_summary(_cart())
+    if not summary["items"]:
+        flash("Your cart is empty.", "error")
+        return redirect(url_for("shop.cart"))
+
+    if request.method == "POST":
+        try:
+            result = order_service.checkout(
+                _cart(),
+                request.form.get("customer_name", ""),
+                request.form.get("customer_email", ""),
+                request.form.get("card_number", ""),
+            )
+        except ValueError as error:
+            flash(str(error), "error")
+        else:
+            if result["success"]:
+                session["cart"] = []
+                session["last_order_id"] = result["order_id"]
+                return redirect(url_for("shop.order_confirmation", order_id=result["order_id"]))
+            flash("The fake payment was declined. Your cart is unchanged.", "error")
+
+    return render_template("shop/checkout.html", cart=summary)
+
+
+@shop_blueprint.get("/orders/<int:order_id>/confirmation")
+def order_confirmation(order_id):
+    """Show the latest successful order only to the browser that placed it."""
+    if session.get("last_order_id") != order_id:
+        return redirect(url_for("shop.cart"))
+
+    order = repository.get_order(current_app.config["DATABASE_PATH"], order_id)
+    if order is None or order["status"] != "paid":
+        return redirect(url_for("shop.cart"))
+    return render_template("shop/order_confirmation.html", order=order)
 
 
 @shop_blueprint.post("/cart/items/<int:variant_id>")

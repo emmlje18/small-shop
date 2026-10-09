@@ -1,0 +1,42 @@
+{% extends "shop_base.html" %}
+{% block title %}Checkout | Small Shop{% endblock %}
+{% block content %}
+  <div class="page-heading">
+    <div>
+      <h1>Checkout</h1>
+      <p>Enter your details to place this guest order.</p>
+    </div>
+    <a class="text-link" href="{{ url_for('shop.cart') }}">Back to cart</a>
+  </div>
+
+  <div class="checkout-layout">
+    <form class="panel checkout-form" method="post">
+      <h2>Your details</h2>
+      <label for="customer_name">Name</label>
+      <input id="customer_name" name="customer_name" value="{{ request.form.get('customer_name', '') }}" required>
+
+      <label for="customer_email">Email</label>
+      <input id="customer_email" name="customer_email" type="email" value="{{ request.form.get('customer_email', '') }}" required>
+
+      <h2>Fake payment</h2>
+      <p class="hint">Use any card number to succeed. A number ending in 0000 is declined.</p>
+      <label for="card_number">Card number</label>
+      <input id="card_number" name="card_number" inputmode="numeric" autocomplete="cc-number" required>
+      <button type="submit">Place order</button>
+    </form>
+
+    <aside class="cart-summary">
+      <h2>Order summary</h2>
+      {% for item in cart["items"] %}
+        <div class="summary-row">
+          <span>{{ item.product_name }} × {{ item.quantity }}</span>
+          <span>€{{ "%.2f"|format(item.line_total_cents / 100) }}</span>
+        </div>
+      {% endfor %}
+      <div class="summary-total">
+        <span>Total</span>
+        <strong>€{{ "%.2f"|format(cart["total_cents"] / 100) }}</strong>
+      </div>
+    </aside>
+  </div>
+{% endblock %}
