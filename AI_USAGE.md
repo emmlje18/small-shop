@@ -2,126 +2,13 @@
 
 This log records meaningful AI assistance used while building the project.
 
-## 2026-10-06 — Commit 1: Flask startup and SQLite schema
-
-- **Commit:** `4103ede` — Create Flask startup skeleton and SQLite schema
-- **Tool:** ChatGPT (Codex)
-- **Prompt:** Review and implement my Stage 1 plan: create the app folder
-  structure, configuration, SQLite schema creation at startup, an app entry
-  point that binds to `0.0.0.0` and reads `PORT`, a root `requirements.txt`,
-  `.gitignore`, a minimal README, and a `/health` route. Do not add shop features
-  yet.
-- **Disposition:** Modified
-- **What changed and why:** The requested startup and schema were implemented.
-  The app also creates `DATA_DIR/uploads` automatically and warns when the
-  default admin password is active.
-- **How it works (in own words):** `app.py` calls `create_app()` to build the
-  Flask application, then starts it on host server `0.0.0.0` and port `8000` by default. `create_app()` reads settings from the environment, creates the data and upload folders,
-  initializes the SQLite tables, and registers `/health` so I can
-  check that the web app responds.
-
-## 2026-10-06 — Commit 2: Catalog storage and service operations
-
-- **Commit:** `e8ef8d5` — Add catalog storage and service operations
-- **Tool:** ChatGPT (Codex)
-- **Prompt:** Implement Stage 2 of the Flask shop: catalog storage and service
-  logic for products and variants, nonnegative price and stock validation, and
-  the three catalog operations orders will need. Keep SQL in the catalog
-  repository, preserve the domain seam, and record the catalog design decision.
-- **Disposition:** Modified
-- **What changed and why:** The catalog service was adapted to the existing
-  SQLite schema and connection helper. Product and variant operations are
-  grouped in `CatalogService`, which can be injected into the future order
-  service. Database connections now close after each operation.
-- **How it works (in own words):** `CatalogService` checks product names, prices, option labels, and stock before
-  saving them. It calls `repository.py`, where SQL creates and lists products and
-  variants. For checkout, `get_variant_snapshot()` returns the product name,
-  option, price, and stock; `decrement_stock()` runs one conditional update so it
-  cannot reduce stock below zero; and `restore_stock()` adds reserved units back.
-  Each repository operation commits its own database work and closes its SQLite
-  connection.
-
-## 2026-10-07 — Commit 3: Container setup for the revised requirements
-
-- **Commit:** `864c39f` — Add provided container template and run instructions
-- **Tool:** ChatGPT (Codex)
-- **Prompt:** Compare my project with the updated assignment repository.
-  Identify any required changes, and make the necessary updates to my
-  individual project.
-- **Disposition:** Modified
-- **What changed and why:** The revised brief requires using the provided
-  Dockerfile template. I copied that template to the project root and copied the
-  provided checker and its instructions into `container/`. I changed only the
-  source-copy TODO so the image includes the `app/` package, pinned Flask, and
-  documented direct and container run commands and environment defaults.
-- **How it works (in own words):** The Dockerfile tells Docker
-  to start with a small Python image, install the exact Flask version from
-  `requirements.txt`, and copy `app.py` and the `app/` folder into the image.
-  When the container starts, `CMD` runs `python app.py`. The app listens on the
-  configured port and puts its SQLite file under `/data`, where Docker can keep
-  it in a volume so it does not get erased. The copied `container/run.sh` builds
-  the image and checks that it starts, responds, honors the port setting, and
-  keeps its database under `/data`.
-
-## 2026-10-07 — Commit 4: Admin catalog pages
-
-- **Commit:** Pending — planned work for admin login and catalog pages
-- **Tool:** ChatGPT (Codex)
-- **Prompt:** Build stage 3: admin login, product listing and
-  creation with a first variant, image extension and size validation, and plain
-  templates. Explain each added function so I can understand the code.
-- **Disposition:** Modified
-- **What changed and why:** Added an admin blueprint and templates, connected
-  them to the app, added image upload validation, and extended product creation
-  to store an optional image path. The provided Dockerfile now copies the
-  templates and stylesheet needed by those pages.
-- **How it works (in own words):** The login compares the
-  entered password with `ADMIN_PASSWORD` and stores a signed-in flag in the
-  Flask session. `admin_required` checks that flag before showing admin pages.
-  The product form converts a price such as `12.50` into integer cents, validates
-  stock as a whole nonnegative number, checks an optional image's extension,
-  and lets `CatalogService` save the product and its first variant. The catalog
-  page asks the service for products and their variants and it is displayed.
-
-## 2026-10-08 — Commit 6: Multiple product options
-
-- **Commit:** — Allow multiple product options in admin form
-- **Tool:** ChatGPT (Codex)
-- **Prompt:** Extend the admin product form so one product can have as many
-  variations as needed, such as different colours of one product. Do not add
-  the example product as shop data.
-- **Disposition:** Modified
-- **What changed and why:** The product form can now add and remove option rows.
-  The route validates every label and stock value before saving the product and
-  all of its variants.
-- **How it works (in own words):** The form has several rows that share the same input names, so `request.form.getlist()` gives me all the labels and all the stock values as two lists. `parse_variants()` puts them together and checks each pair, and only if they're all valid does the catalog service save them. The JavaScript just copies a hidden template row when I press "Add option" and prevents deletion of last row.
-
-## 2026-10-08 — Customer catalog pages
-
-- **Commit:** Add customer product catalog pages
-- **Tool:** ChatGPT (Codex)
-- **Prompt:** Build customer catalog browsing with a home page, product-detail
-  pages, product images, and an option dropdown. Keep cart and checkout for a
-  later stage and keep the application within the assignment architecture.
-- **Disposition:** Modified
-- **What changed and why:** Added public catalog routes and templates. The
-  catalog repository can now read one active product by id, and the customer
-  pages display active products and their in-stock options.
-- **How it works (in own words):** `product_list()` fetches all active products from `CatalogService` and passes them to the home page template. `product_detail()` fetches one product with its variants, and returns a 404 error page if the product doesn’t exist or is inactive. In the variant dropdown, each option’s value is the variant id, and its text shows the option label and remaining stock. These storefront routes live in the catalog domain because they only read catalog data, so the future orders service still depends only on the three seam functions (`get_variant_snapshot`,   `decrement_stock`, `restore_stock`)
-
-## 2026-10-09 — Session-based shopping cart
-
-- **Commit:** Add session-based shopping cart
-- **Tool:** ChatGPT (Codex)
-- **Prompt:** Build the cart as the first orders-domain feature. Store it in the
-  Flask session, merge duplicate options, show totals and current stock, and
-  keep checkout, payment, order creation, and stock changes for a later stage.
-  Explain the code simply after implementation.
-- **Disposition:** Modified
-- **What changed and why:** Added `OrderService` cart operations, customer cart
-  routes, an add-to-cart form, a cart page, and quantity-update and remove
-  controls. The service receives a catalog object, so it uses the defined
-  catalog seam instead of accessing catalog SQL or tables itself.
-- **How it works (in own words):** The Flask session stores the cart as a list like `[{"variant_id": 4, "qty": 2}]`. `add_to_cart()` first asks the injected catalog service for a current snapshot through the seam function `get_variant_snapshot(variant_id)`, then copies the list and looks for a line with the same `variant_id`. If it finds one, it adds to that line’s quantity, otherwise, it appends a new line. It refuses the change if the resulting quantity is more than the current stock.
-
-`cart_summary()` looks up a fresh snapshot for each cart line, so the displayed price and stock use current catalog data, and it totals prices in cents. If an option no longer exists, it is skipped from the displayed summary. The routes call these methods and store the returned cart list back in the session.
+| Date / commit | Tool | Prompt | Disposition | What changed & why (if modified) | In my own words, how this works |
+| --- | --- | --- | --- | --- | --- |
+| 2026-10-06 / `4103ede` — Create Flask startup skeleton and SQLite schema | ChatGPT (Codex) | Review and implement Stage 1: create the app folder structure, configuration, SQLite schema creation at startup, an entry point that binds to `0.0.0.0` and reads `PORT`, a root `requirements.txt`, `.gitignore`, a minimal README, and a `/health` route. Do not add shop features yet. | Accepted | — | `app.py` calls `create_app()` to build the Flask application, then starts it on host server `0.0.0.0` and port `8000` by default. `create_app()` reads settings from the environment, creates the data and upload folders, initializes the SQLite tables, and registers `/health` so I can check that the web app responds. |
+| 2026-10-06 / `e8ef8d5` — Add catalog storage and service operations | ChatGPT (Codex) | Implement Stage 2: catalog storage and service logic for products and variants, nonnegative price and stock validation, and the three catalog operations orders will need. Keep SQL in the catalog repository and preserve the domain seam. | Accepted | — | `CatalogService` checks product names, prices, option labels, and stock before saving them. It calls `repository.py`, where SQL creates and lists products and variants. For checkout, `get_variant_snapshot()` returns the product name, option, price, and stock; `decrement_stock()` runs one conditional update so it cannot reduce stock below zero; and `restore_stock()` adds reserved units back. Each repository operation commits its own database work and closes its SQLite connection. |
+| 2026-10-07 / `864c39f` — Add provided container template and run instructions | ChatGPT (Codex) | Compare my project with the updated assignment repository. Identify any required changes, and make the necessary updates to my individual project. | Accepted | — | The Dockerfile tells Docker to start with a small Python image, install the exact Flask version from `requirements.txt`, and copy `app.py` and the `app/` folder into the image. When the container starts, `CMD` runs `python app.py`. The app listens on the configured port and puts its SQLite file under `/data`, where Docker can keep it in a volume so it does not get erased. The copied `container/run.sh` builds the image and checks that it starts, responds, honors the port setting, and keeps its database under `/data`. |
+| 2026-10-08 / `0066d9d` — Add admin catalog management pages | ChatGPT (Codex) | Build Stage 3: admin login, product listing and creation with a first variant, image extension and size validation, and plain templates. Explain each added function so I can understand the code. | Accepted | — | The login compares the entered password with `ADMIN_PASSWORD` and stores a signed-in flag in the Flask session. `admin_required` checks that flag before showing admin pages. The product form converts a price such as `12.50` into integer cents, validates stock as a whole nonnegative number, checks an optional image's extension, and lets `CatalogService` save the product and its first variant. The catalog page asks the service for products and their variants and it is displayed. |
+| 2026-10-08 / `6600c95` — Allow multiple product options in admin form | ChatGPT (Codex) | Extend the admin product form so one product can have as many variations as needed, such as different colours of one product. Do not add the example product as shop data. | Accepted | — | The form has several rows that share the same input names, so `request.form.getlist()` gives me all the labels and all the stock values as two lists. `parse_variants()` puts them together and checks each pair, and only if they're all valid does the catalog service save them. The JavaScript just copies a hidden template row when I press "Add option" and prevents deletion of last row. |
+| 2026-10-08 / `31cd1ba` — Add customer product catalog pages | ChatGPT (Codex) | Build customer catalog browsing with a home page, product-detail pages, product images, and an option dropdown. Keep cart and checkout for a later stage and keep the application within the assignment architecture. | Accepted | — | `product_list()` fetches all active products from `CatalogService` and passes them to the home page template. `product_detail()` fetches one product with its variants, and returns a 404 error page if the product doesn’t exist or is inactive. In the variant dropdown, each option’s value is the variant id, and its text shows the option label and remaining stock. These storefront routes live in the catalog domain because they only read catalog data, so the future orders service still depends only on the three seam functions (`get_variant_snapshot`, `decrement_stock`, `restore_stock`). |
+| 2026-10-09 / `15b2637` — Add session-based shopping cart | ChatGPT (Codex) | Build the cart as the first orders-domain feature. Store it in the Flask session, merge duplicate options, show totals and current stock, and keep checkout, payment, order creation, and stock changes for a later stage. Explain the code simply after implementation. | Modified | I changed the generated storefront presentation so product images have consistent display sizes and each cart line has a thumbnail. | The Flask session stores the cart as a list like `[{"variant_id": 4, "qty": 2}]`. `add_to_cart()` asks the injected catalog service for a current snapshot through `get_variant_snapshot(variant_id)`, copies the list, and looks for a line with the same `variant_id`. If it finds one, it increases that line's quantity; otherwise it appends a new line. It refuses the change if the resulting quantity is above current stock.<br><br>`cart_summary()` gets a fresh snapshot for each cart line, so displayed prices and stock are current, then totals prices in cents. If an option no longer exists, it is skipped. The routes call these methods and store the returned cart list back in the session. |
+| 2026-10-09 / `13a7c2b` — Checkout and fake payment | ChatGPT (Codex) | Add guest checkout, order and order-item saving, the required fake payment provider, stock restoration after a failed payment, and an order confirmation page. Keep the code simple and follow the catalog/orders seam. | Accepted | — | `OrderService.checkout()` loops over the cart lines and gets a snapshot for each, then calls `CatalogService.decrement_stock()`. If any decrement fails, it restores the lines it already decremented and returns a sold-out error without charging. Otherwise `create_pending_order()` saves the order as `pending` and creates one `order_items` row per line, copying the product name, option label, and unit price at that moment, so later catalog changes do not alter the order. It then calls `FakePaymentProvider.charge()` with the total in cents and the card number. A card ending in `0000` fails. On success the order becomes `paid`. The checkout route clears the session cart before redirecting to the confirmation page. On failure the order becomes `cancelled` and every line's quantity is added back to stock. The card number is not stored. |
