@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Edit product | Small Shop Admin{% endblock %}
+{% block content %}
+  <a class="back-link" href="{{ url_for('admin.products') }}">Back to products</a>
+  <section class="panel form-panel">
+    <h1>Edit product</h1>
+    <form method="post" enctype="multipart/form-data">
+      <label for="name">Product name</label>
+      <input id="name" name="name" value="{{ product.name }}" required>
+
+      <label for="description">Description</label>
+      <textarea id="description" name="description" rows="4">{{ product.description }}</textarea>
+
+      <label for="price">Price in euros</label>
+      <input id="price" name="price" type="number" min="0" step="0.01" value="{{ '%.2f'|format(product.price_cents / 100) }}" required>
+
+      <label for="image">Replace product image (optional)</label>
+      <input id="image" name="image" type="file" accept=".jpg,.jpeg,.png,.gif,.webp">
+      <p class="hint">Leave this empty to keep the current image.</p>
+
+      <button type="submit">Save product</button>
+    </form>
+  </section>
+
+  <section class="panel form-panel">
+    <h2>Current options</h2>
+    <ul>
+      {% for variant in product.variants %}
+        <li>{{ variant.option_label }} — {{ variant.stock }} in stock</li>
+      {% endfor %}
+    </ul>
+
+    <h2>Add another option</h2>
+    <form method="post" action="{{ url_for('admin.add_product_variant', product_id=product.id) }}">
+      <label for="option_label">Option label</label>
+      <input id="option_label" name="option_label" placeholder="Example: Blue" required>
+
+      <label for="stock">Stock</label>
+      <input id="stock" name="stock" type="number" min="0" step="1" required>
+
+      <button type="submit">Add option</button>
+    </form>
+  </section>
+{% endblock %}

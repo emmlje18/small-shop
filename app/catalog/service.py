@@ -36,6 +36,38 @@ class CatalogService:
             return None
         return repository.get_product(self.database_path, product_id)
 
+    def get_product_for_admin(self, product_id):
+        """Return one product for the protected edit page."""
+        if not self._is_positive_integer(product_id):
+            return None
+        return repository.get_product_for_admin(self.database_path, product_id)
+
+    def update_product(self, product_id, name, description, price_cents, image_path):
+        """Validate and update one product while keeping its current image when set."""
+        clean_name = name.strip() if isinstance(name, str) else ""
+        if not self._is_positive_integer(product_id):
+            raise ValueError("Product id must be a positive integer.")
+        if not clean_name:
+            raise ValueError("Product name is required.")
+        if not self._is_nonnegative_integer(price_cents):
+            raise ValueError("Price must be a nonnegative integer number of cents.")
+        if not isinstance(description, str):
+            raise ValueError("Description must be text.")
+        return repository.update_product(
+            self.database_path,
+            product_id,
+            clean_name,
+            description.strip(),
+            price_cents,
+            image_path,
+        )
+
+    def deactivate_product(self, product_id):
+        """Remove an active product from customer pages without deleting it."""
+        if not self._is_positive_integer(product_id):
+            return False
+        return repository.deactivate_product(self.database_path, product_id)
+
     def add_variant(self, product_id, option_label, stock):
         """Validate and save a stock option for an existing product."""
         clean_label = option_label.strip() if isinstance(option_label, str) else ""

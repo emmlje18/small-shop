@@ -37,6 +37,40 @@ def get_product(database_path, product_id):
         return dict(row) if row is not None else None
 
 
+def get_product_for_admin(database_path, product_id):
+    """Return one product for editing, including an inactive product if needed."""
+    with database_connection(database_path) as connection:
+        row = connection.execute(
+            """SELECT id, name, description, price_cents, image_path,
+                      is_active, created_at
+               FROM products WHERE id = ?""",
+            (product_id,),
+        ).fetchone()
+        return dict(row) if row is not None else None
+
+
+def update_product(database_path, product_id, name, description, price_cents, image_path):
+    """Update the editable fields for one existing product."""
+    with database_connection(database_path) as connection:
+        cursor = connection.execute(
+            """UPDATE products
+               SET name = ?, description = ?, price_cents = ?, image_path = ?
+               WHERE id = ?""",
+            (name, description, price_cents, image_path, product_id),
+        )
+        return cursor.rowcount == 1
+
+
+def deactivate_product(database_path, product_id):
+    """Hide one product from the storefront without deleting old order snapshots."""
+    with database_connection(database_path) as connection:
+        cursor = connection.execute(
+            "UPDATE products SET is_active = 0 WHERE id = ? AND is_active = 1",
+            (product_id,),
+        )
+        return cursor.rowcount == 1
+
+
 def create_variant(database_path, product_id, option_label, stock):
     """Save one product option and return its new database id."""
     with database_connection(database_path) as connection:

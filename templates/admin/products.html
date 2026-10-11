@@ -30,6 +30,12 @@
             {% else %}
               <p>No options have been added.</p>
             {% endif %}
+            <p>
+              <a class="text-link" href="{{ url_for('admin.edit_product', product_id=product.id) }}">Edit product</a>
+            </p>
+            <form method="post" action="{{ url_for('admin.delete_product', product_id=product.id) }}">
+              <button class="text-button" type="submit">Remove from storefront</button>
+            </form>
           </div>
         </article>
       {% endfor %}

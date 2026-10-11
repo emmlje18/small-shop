@@ -187,6 +187,73 @@ def new_product():
     return render_template("admin/new_product.html")
 
 
+@admin_blueprint.route("/products/<int:product_id>/edit", methods=["GET", "POST"])
+@admin_required
+def edit_product(product_id):
+    """Show and update one product without changing its existing options."""
+    catalog = _catalog_service()
+    product = catalog.get_product_for_admin(product_id)
+    if product is None:
+        return render_template("shop/not_found.html"), 404
+
+    if request.method == "POST":
+        image_path = product["image_path"]
+        new_image_path = None
+        try:
+            price_cents = parse_price_cents(request.form.get("price", ""))
+            new_image_path = save_uploaded_image(
+                request.files.get("image"), current_app.config["UPLOAD_DIR"]
+            )
+            if new_image_path:
+                image_path = new_image_path
+            catalog.update_product(
+                product_id,
+                request.form.get("name", ""),
+                request.form.get("description", ""),
+                price_cents,
+                image_path,
+            )
+        except ValueError as error:
+            if new_image_path:
+                (Path(current_app.config["UPLOAD_DIR"]) / new_image_path).unlink(
+                    missing_ok=True
+                )
+            flash(str(error), "error")
+        else:
+            flash("Product updated.", "success")
+            return redirect(url_for("admin.products"))
+
+    product["variants"] = catalog.list_variants(product_id)
+    return render_template("admin/edit_product.html", product=product)
+
+
+@admin_blueprint.post("/products/<int:product_id>/variants")
+@admin_required
+def add_product_variant(product_id):
+    """Add one more option to an existing product from its edit page."""
+    try:
+        stock = parse_nonnegative_integer(request.form.get("stock"), "Stock")
+        _catalog_service().add_variant(
+            product_id, request.form.get("option_label", ""), stock
+        )
+    except ValueError as error:
+        flash(str(error), "error")
+    else:
+        flash("Option added.", "success")
+    return redirect(url_for("admin.edit_product", product_id=product_id))
+
+
+@admin_blueprint.post("/products/<int:product_id>/delete")
+@admin_required
+def delete_product(product_id):
+    """Deactivate a product so existing order snapshots remain valid."""
+    if _catalog_service().deactivate_product(product_id):
+        flash("Product removed from the storefront.", "success")
+    else:
+        flash("This product was already removed or does not exist.", "error")
+    return redirect(url_for("admin.products"))
+
+
 @admin_blueprint.get("/uploads/<filename>")
 @admin_required
 def uploaded_file(filename):
