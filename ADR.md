@@ -31,3 +31,11 @@ Context: The assignment requires at least 70% coverage of core business logic. C
 Decision: Use `pytest` and `pytest-cov` for service, repository, and fake-payment tests. Use a separate temporary SQLite database for each database test and an in-memory fake catalog for order-service tests.
 Alternatives considered: Test only through Flask pages or manually in the browser. Those approaches would make it harder to test failure paths such as overselling and payment failure, and would focus coverage on routes instead of business rules.
 Consequences: Tests run quickly and can safely check stock restoration and order status changes. The tests do not cover template rendering or browser behavior, so those remain part of manual container verification.
+
+## [5]. Do not integrate a real payment provider
+Date: 2026-10-11
+Status: Decided
+Context: The shop needs a checkout outcome so it can demonstrate paid and cancelled orders, but the assignment is a self-contained local application. A real payment provider would require external accounts, secret keys, network access, and additional security responsibilities.
+Decision: Use `FakePaymentProvider` inside the same process. Its `charge()` method declines card numbers ending in `0000` and returns a generated fake reference for other card numbers.
+Alternatives considered: Integrate Stripe or another real payment provider. That would add an external runtime dependency and would require handling real credentials and payment data, which is outside the assignment scope.
+Consequences: Checkout can exercise success and failure paths without processing real money or storing card numbers. A later real integration could replace `FakePaymentProvider` while keeping `OrderService` dependent on the same `charge()` operation.
