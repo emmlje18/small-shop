@@ -58,5 +58,47 @@ Run the copied course contract checker from the project root:
 ./container/run.sh .
 ```
 
-The checker requires Docker to be running. Add its passing output here before
-submission.
+The checker requires Docker Desktop to be running.
+
+## Test coverage
+
+Run the core business-logic tests and coverage report from the project root:
+
+```sh
+python3 -m pytest --cov=app.catalog.service --cov=app.catalog.repository --cov=app.orders.service --cov=app.orders.repository --cov=app.orders.payment --cov-report=term-missing
+```
+
+Latest result: **13 tests passed, 79% coverage** across the selected catalog and
+orders business-logic modules. Flask routes and templates are excluded because
+the assignment asks for unit tests of core logic rather than framework glue.
+
+## Container verification evidence
+
+The provided checker was run on 2026-10-12 and passed every check:
+
+```text
+=== SDD Assignment 1 contract check ===
+Repository: /Users/emmaliu/small-shop
+
+==> Repository shape
+  PASS  one Dockerfile, one manifest (requirements.txt)
+
+==> Build from a clean context, no build args
+  PASS  image built
+  PASS  image size 232 MB
+
+==> Start on PORT=8000 and reach it from the host
+  PASS  HTTP 200 from http://localhost:8000/
+
+==> SQLite file under DATA_DIR
+  PASS  found in /data: shop.db uploads
+
+==> Data persists, and a second boot does not re-seed
+  PASS  volume at /data persists
+  PASS  row counts unchanged across restart: order_items=0 orders=0 product_variants=0 products=0
+
+==> PORT override is honoured (not hardcoded)
+  PASS  HTTP 200 from http://localhost:9123/
+
+=== ALL CHECKS PASSED ===
+```

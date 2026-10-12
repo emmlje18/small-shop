@@ -24,11 +24,24 @@
 
   <section class="panel form-panel">
     <h2>Current options</h2>
-    <ul>
-      {% for variant in product.variants %}
-        <li>{{ variant.option_label }} — {{ variant.stock }} in stock</li>
-      {% endfor %}
-    </ul>
+    {% for variant in product.variants %}
+      <form method="post" class="option-row" action="{{ url_for('admin.update_product_variant', product_id=product.id, variant_id=variant.id) }}">
+        <div>
+          <label for="option-label-{{ variant.id }}">Option label</label>
+          <input id="option-label-{{ variant.id }}" name="option_label" value="{{ variant.option_label }}" required>
+        </div>
+        <div>
+          <label for="option-stock-{{ variant.id }}">Stock</label>
+          <input id="option-stock-{{ variant.id }}" name="stock" type="number" min="0" step="1" value="{{ variant.stock }}" required>
+        </div>
+        <button type="submit">Update</button>
+      </form>
+      <form method="post" action="{{ url_for('admin.remove_product_variant', product_id=product.id, variant_id=variant.id) }}">
+        <button class="text-button" type="submit">Remove option from sale</button>
+      </form>
+    {% else %}
+      <p>No options have been added.</p>
+    {% endfor %}
 
     <h2>Add another option</h2>
     <form method="post" action="{{ url_for('admin.add_product_variant', product_id=product.id) }}">

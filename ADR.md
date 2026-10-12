@@ -22,7 +22,7 @@ Status: Decided
 Context: A product's name, price, and options can change after a customer buys it. The orders domain must also remain independent from catalog tables so it can be separated later.
 Decision: Store money as integer cents. Save `product_name`, `option_label`, and `unit_price_cents` in each `order_items` row at checkout, and keep `variant_id` as a plain integer without a foreign key to catalog tables.
 Alternatives considered: Link each order item only to the current product variant with a foreign key. That would make old order details depend on later catalog changes and would couple the two domains more tightly.
-Consequences: Old orders retain the original product details and price even if the catalog changes. The data is intentionally duplicated, and stock restoration must use the saved variant id.
+Consequences: Old orders retain the original product details and price even if the catalog changes. The data is intentionally duplicated, and stock restoration must use the saved variant id. An option removed from sale keeps its variant row and is set to zero stock, so saved orders can still refer to that id.
 
 ## [4]. Test domain rules with pytest and temporary SQLite files
 Date: 2026-10-10

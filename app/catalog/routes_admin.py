@@ -243,6 +243,36 @@ def add_product_variant(product_id):
     return redirect(url_for("admin.edit_product", product_id=product_id))
 
 
+@admin_blueprint.post("/products/<int:product_id>/variants/<int:variant_id>")
+@admin_required
+def update_product_variant(product_id, variant_id):
+    """Update one existing option label and stock number from the edit page."""
+    try:
+        stock = parse_nonnegative_integer(request.form.get("stock"), "Stock")
+        updated = _catalog_service().update_variant(
+            product_id, variant_id, request.form.get("option_label", ""), stock
+        )
+        if not updated:
+            raise ValueError("This option does not belong to the product.")
+    except ValueError as error:
+        flash(str(error), "error")
+    else:
+        flash("Option updated.", "success")
+    return redirect(url_for("admin.edit_product", product_id=product_id))
+
+
+@admin_blueprint.post("/products/<int:product_id>/variants/<int:variant_id>/remove")
+@admin_required
+def remove_product_variant(product_id, variant_id):
+    """Make one option unavailable without deleting its database record."""
+    removed = _catalog_service().remove_variant_from_sale(product_id, variant_id)
+    if removed:
+        flash("Option removed from sale.", "success")
+    else:
+        flash("This option does not belong to the product.", "error")
+    return redirect(url_for("admin.edit_product", product_id=product_id))
+
+
 @admin_blueprint.post("/products/<int:product_id>/delete")
 @admin_required
 def delete_product(product_id):

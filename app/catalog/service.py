@@ -81,6 +81,31 @@ class CatalogService:
             self.database_path, product_id, clean_label, stock
         )
 
+    def update_variant(self, product_id, variant_id, option_label, stock):
+        """Validate and update an existing product option and its stock level."""
+        clean_label = option_label.strip() if isinstance(option_label, str) else ""
+        if not self._is_positive_integer(product_id):
+            raise ValueError("Product id must be a positive integer.")
+        if not self._is_positive_integer(variant_id):
+            raise ValueError("Option id must be a positive integer.")
+        if not clean_label:
+            raise ValueError("Option label is required.")
+        if not self._is_nonnegative_integer(stock):
+            raise ValueError("Stock must be a nonnegative integer.")
+        return repository.update_variant(
+            self.database_path, product_id, variant_id, clean_label, stock
+        )
+
+    def remove_variant_from_sale(self, product_id, variant_id):
+        """Make an option unavailable while preserving its variant id for orders."""
+        if not self._is_positive_integer(product_id):
+            return False
+        if not self._is_positive_integer(variant_id):
+            return False
+        return repository.remove_variant_from_sale(
+            self.database_path, product_id, variant_id
+        )
+
     def list_variants(self, product_id):
         """List options and stock for one product."""
         return repository.list_variants(self.database_path, product_id)

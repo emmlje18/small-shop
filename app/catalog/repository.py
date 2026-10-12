@@ -82,6 +82,29 @@ def create_variant(database_path, product_id, option_label, stock):
         return cursor.lastrowid
 
 
+def update_variant(database_path, product_id, variant_id, option_label, stock):
+    """Update one option only when it belongs to the selected product."""
+    with database_connection(database_path) as connection:
+        cursor = connection.execute(
+            """UPDATE product_variants
+               SET option_label = ?, stock = ?
+               WHERE id = ? AND product_id = ?""",
+            (option_label, stock, variant_id, product_id),
+        )
+        return cursor.rowcount == 1
+
+
+def remove_variant_from_sale(database_path, product_id, variant_id):
+    """Set an option's stock to zero without deleting its purchase history link."""
+    with database_connection(database_path) as connection:
+        cursor = connection.execute(
+            """UPDATE product_variants SET stock = 0
+               WHERE id = ? AND product_id = ?""",
+            (variant_id, product_id),
+        )
+        return cursor.rowcount == 1
+
+
 def list_variants(database_path, product_id):
     """Return the options belonging to one product."""
     with database_connection(database_path) as connection:
