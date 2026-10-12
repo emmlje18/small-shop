@@ -1,4 +1,4 @@
-# Small Shop
+# Emma's cool shop
 
 A small Flask online shop, built as one process with SQLite storage.
 

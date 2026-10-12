@@ -6,7 +6,11 @@
 
 * { box-sizing: border-box; }
 
-body { margin: 0; }
+body {
+  min-height: 100vh;
+  margin: 0;
+  background: url("cloud-sunset-background.png") center / cover fixed no-repeat;
+}
 
 .topbar {
   display: flex;
@@ -14,7 +18,7 @@ body { margin: 0; }
   justify-content: space-between;
   padding: 1rem max(1.25rem, calc((100% - 900px) / 2));
   color: white;
-  background: #29483b;
+  background: #4f2f6b;
 }
 
 .topbar a { color: white; font-weight: 700; text-decoration: none; }
@@ -64,20 +68,20 @@ body { margin: 0; }
 .checkout-form { margin: 0; }
 .checkout-form h2:first-child { margin-top: 0; }
 .confirmation-panel { max-width: 620px; margin: 4rem auto; }
-.back-link { display: inline-block; margin-bottom: 1rem; color: #29483b; }
+.back-link { display: inline-block; margin-bottom: 1rem; color: #4f2f6b; }
 .price { font-size: 1.1rem; font-weight: 700; }
-.text-link, .text-button { color: #29483b; background: transparent; border: 0; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+.text-link, .text-button { color: #4f2f6b; background: transparent; border: 0; font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
 .text-button { margin: 0.5rem 0 0; padding: 0; }
 
 form label { display: block; margin: 1rem 0 0.35rem; font-weight: 600; }
 input, textarea { width: 100%; padding: 0.7rem; border: 1px solid #aeb8ad; border-radius: 5px; font: inherit; }
-button, .button { display: inline-block; margin-top: 1rem; padding: 0.7rem 1rem; border: 0; border-radius: 5px; color: white; background: #29483b; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
+button, .button { display: inline-block; margin-top: 1rem; padding: 0.7rem 1rem; border: 0; border-radius: 5px; color: white; background: #4f2f6b; font: inherit; font-weight: 600; text-decoration: none; cursor: pointer; }
 .link-button { margin: 0; padding: 0; background: transparent; text-decoration: underline; }
 .form-actions { display: flex; align-items: center; gap: 1rem; }
 .hint { margin: 0.35rem 0; color: #5c665d; font-size: 0.9rem; }
 .variants-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; }
 .variants-heading h2 { margin-bottom: 0; }
-.secondary-button { background: #586958; }
+.secondary-button { background: #4f2f6b; }
 .option-row { display: grid; grid-template-columns: 1fr 130px auto; align-items: end; gap: 0.75rem; margin: 0.75rem 0; }
 .option-row button { margin-top: 0; }
 .remove-option:disabled { cursor: not-allowed; opacity: 0.5; }

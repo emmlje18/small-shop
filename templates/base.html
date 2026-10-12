@@ -3,16 +3,19 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Small Shop Admin{% endblock %}</title>
+  <title>{% block title %}Emma's cool shop Admin{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <header class="topbar">
-    <a href="{{ url_for('admin.products') }}">Small Shop Admin</a>
+    <a href="{{ url_for('admin.products') }}">Emma's cool shop Admin</a>
     {% if session.get('admin_logged_in') %}
-      <form method="post" action="{{ url_for('admin.logout') }}">
-        <button class="link-button" type="submit">Log out</button>
-      </form>
+      <nav class="shop-navigation">
+        <a class="topbar-link" href="{{ url_for('catalog.product_list') }}">Browse the shop</a>
+        <form method="post" action="{{ url_for('admin.logout') }}">
+          <button class="link-button" type="submit">Log out</button>
+        </form>
+      </nav>
     {% endif %}
   </header>
   <main class="page">

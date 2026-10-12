@@ -3,12 +3,12 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Small Shop{% endblock %}</title>
+  <title>{% block title %}Emma's cool shop{% endblock %}</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
   <header class="topbar">
-    <a href="{{ url_for('catalog.product_list') }}">Small Shop</a>
+    <a href="{{ url_for('catalog.product_list') }}">Emma's cool shop</a>
     <nav class="shop-navigation">
       <a class="topbar-link" href="{{ url_for('shop.cart') }}">Cart ({{ session.get('cart', [])|length }})</a>
       <a class="topbar-link" href="{{ url_for('admin.login') }}">Admin</a>
