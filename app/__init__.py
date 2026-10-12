@@ -1,6 +1,7 @@
 """Application setup for the small shop."""
 
-from flask import Flask, jsonify
+from flask import Flask, flash, jsonify, redirect, request
+from werkzeug.exceptions import RequestEntityTooLarge
 
 from app.config import get_config
 from app.db import initialize_database
@@ -32,5 +33,11 @@ def create_app():
     def health():
         """Report that the web process is responding."""
         return jsonify(status="ok")
+
+    @app.errorhandler(RequestEntityTooLarge)
+    def upload_too_large(error):
+        """Return an admin visitor to the form with a useful upload message."""
+        flash("Image uploads must be smaller than 5 MB.", "error")
+        return redirect(request.referrer or "/admin/products/new")
 
     return app
