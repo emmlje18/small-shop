@@ -85,7 +85,7 @@ Repository: /Users/emmaliu/small-shop
 
 ==> Build from a clean context, no build args
   PASS  image built
-  PASS  image size 232 MB
+  PASS  image size 270 MB
 
 ==> Start on PORT=8000 and reach it from the host
   PASS  HTTP 200 from http://localhost:8000/
