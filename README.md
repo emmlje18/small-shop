@@ -20,7 +20,7 @@ Check that the app is running at <http://127.0.0.1:8000/health>.
 The admin catalog pages are at <http://127.0.0.1:8000/admin/login>. The local
 default password is `admin`; set `ADMIN_PASSWORD` before using the admin pages
 outside local development. Product images may be JPG, JPEG, PNG, GIF, or WebP,
-up to 2 MiB per request.
+up to 5 MiB per request.
 
 ## Configure the app
 
@@ -68,7 +68,7 @@ Run the core business-logic tests and coverage report from the project root:
 python3 -m pytest --cov=app.catalog.service --cov=app.catalog.repository --cov=app.orders.service --cov=app.orders.repository --cov=app.orders.payment --cov-report=term-missing
 ```
 
-Latest result: **13 tests passed, 79% coverage** across the selected catalog and
+Latest result: **26 tests passed, 87% coverage** across the selected catalog and
 orders business-logic modules. Flask routes and templates are excluded because
 the assignment asks for unit tests of core logic rather than framework glue.
 
