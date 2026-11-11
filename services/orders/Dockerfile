@@ -23,6 +23,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY orders/ ./orders/
 COPY migrations/ ./migrations/
 
+# Commit SHA, reported by /health as "version". CI passes --build-arg GIT_SHA.
+ARG GIT_SHA=dev
+ENV GIT_SHA=${GIT_SHA}
+
 USER appuser
 
 EXPOSE 8000
