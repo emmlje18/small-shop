@@ -35,6 +35,8 @@ EXPOSE 8000
 HEALTHCHECK --interval=15s --timeout=3s --start-period=60s --retries=3 \
   CMD python -c "import os,urllib.request; urllib.request.urlopen(f'http://127.0.0.1:{os.environ[\"PORT\"]}/health', timeout=2)" || exit 1
 
-# sh -c so ${PORT} is expanded at run time; exec so gunicorn becomes PID 1
+# Migrations run once here, before gunicorn forks its workers; if they fail,
+# && stops the container instead of serving an old schema. sh -c so ${PORT}
+# is expanded at run time; exec so gunicorn becomes PID 1
 # and receives SIGTERM directly when the container stops.
-CMD ["sh", "-c", "exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --timeout 90 'orders:create_app()'"]
+CMD ["sh", "-c", "python -m orders.migrate && exec gunicorn --bind 0.0.0.0:${PORT} --workers 2 --timeout 90 'orders:create_app()'"]
