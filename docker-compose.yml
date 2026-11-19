@@ -53,6 +53,8 @@ services:
     environment:
       PORT: "8000"
       DATABASE_URL: mssql+pymssql://catalog_user:${CATALOG_DB_PASSWORD:-LocalDev_Catalog_1}@mssql:1433/catalog_db
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
+      INTERNAL_TOKEN: ${INTERNAL_TOKEN:-local-internal-token}
     ports:
       - "8001:8000"
 
