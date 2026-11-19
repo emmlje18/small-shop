@@ -3,6 +3,7 @@
 import logging
 import os
 import time
+from contextlib import contextmanager
 from urllib.parse import unquote, urlparse
 
 import pymssql
@@ -45,3 +46,22 @@ def connect(database_url=None):
                 attempt, attempts, error, delay,
             )
             time.sleep(delay)
+
+
+@contextmanager
+def transaction(database_url=None):
+    """Give a cursor that returns rows as dicts; commit on success, roll back on error.
+
+    Every repository function uses this, so each one is a single unit of work:
+    either all of its SQL is saved or none of it is.
+    """
+    connection = connect(database_url)
+    try:
+        cursor = connection.cursor(as_dict=True)
+        yield cursor
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
