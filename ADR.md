@@ -39,3 +39,11 @@ Context: The shop needs a checkout outcome so it can demonstrate paid and cancel
 Decision: Use `FakePaymentProvider` inside the same process. Its `charge()` method declines card numbers ending in `0000` and returns a generated fake reference for other card numbers.
 Alternatives considered: Integrate Stripe or another real payment provider. That would add an external runtime dependency and would require handling real credentials and payment data, which is outside the assignment scope.
 Consequences: Checkout can exercise success and failure paths without processing real money or storing card numbers. A later real integration could replace `FakePaymentProvider` while keeping `OrderService` dependent on the same `charge()` operation.
+
+## [6]. Split into catalog and orders services along the ADR-2 seam
+Date: 2026-11-20
+Status: Decided
+Context: Assignment 2 needs one service per domain, each with its own database, talking over HTTP, with a static UI on a different website.
+Decision: Catalog owns products and variants; orders owns orders and order items. ADR-2's three operations become catalog endpoints (`/internal/variants/{id}`, `/decrement`, `/restore`) that orders calls with a secret `X-Internal-Token`. Checkout stays in orders and calls catalog on the server. Images move into the catalog database, admin sends its password in a header, and the cart moves to the browser, because container disks are wiped and cross-site cookies are blocked.
+Alternatives considered: Checkout in the UI calling both services, but a closed tab could skip giving stock back. Image URLs instead of uploads, but that drops the upload feature.
+Consequences: ADR-2 held, and no table had to move. Checkout now spans two databases, so orders must give stock back itself when payment fails. The internal endpoints are public and rely on the token.
