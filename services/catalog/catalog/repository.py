@@ -7,19 +7,21 @@ transaction (see db.transaction). Values are always passed as parameters
 
 from catalog.db import transaction
 
-PRODUCT_COLUMNS = "id, name, description, price_cents, image_path, is_active, created_at"
+# has_image says whether a picture exists without loading its bytes.
+PRODUCT_COLUMNS = """id, name, description, price_cents, is_active, created_at,
+    CAST(CASE WHEN image_data IS NULL THEN 0 ELSE 1 END AS BIT) AS has_image"""
 
 
-def create_product(database_url, name, description, price_cents, image_path=None):
+def create_product(database_url, name, description, price_cents):
     """Save one product and return its new database id."""
     with transaction(database_url) as cursor:
         # OUTPUT INSERTED.id returns the id SQL Server just generated
         # (SQLite used cursor.lastrowid for this).
         cursor.execute(
-            """INSERT INTO products (name, description, price_cents, image_path)
+            """INSERT INTO products (name, description, price_cents)
                OUTPUT INSERTED.id
-               VALUES (%s, %s, %s, %s)""",
-            (name, description, price_cents, image_path),
+               VALUES (%s, %s, %s)""",
+            (name, description, price_cents),
         )
         return cursor.fetchone()["id"]
 
@@ -52,14 +54,14 @@ def get_product_for_admin(database_url, product_id):
         return cursor.fetchone()
 
 
-def update_product(database_url, product_id, name, description, price_cents, image_path):
+def update_product(database_url, product_id, name, description, price_cents):
     """Update the editable fields for one existing product."""
     with transaction(database_url) as cursor:
         cursor.execute(
             """UPDATE products
-               SET name = %s, description = %s, price_cents = %s, image_path = %s
+               SET name = %s, description = %s, price_cents = %s
                WHERE id = %s""",
-            (name, description, price_cents, image_path, product_id),
+            (name, description, price_cents, product_id),
         )
         return cursor.rowcount == 1
 
@@ -133,18 +135,39 @@ def get_variant_snapshot(database_url, variant_id):
         return cursor.fetchone()
 
 
-def get_variant_image_path(database_url, variant_id):
-    """Return the main image path for one active product option."""
+def set_product_image(database_url, product_id, image_data, content_type):
+    """Store an uploaded picture on the product row, replacing any earlier one."""
     with transaction(database_url) as cursor:
         cursor.execute(
-            """SELECT p.image_path
+            """UPDATE products SET image_data = %s, image_content_type = %s
+               WHERE id = %s""",
+            (image_data, content_type, product_id),
+        )
+        return cursor.rowcount == 1
+
+
+def get_product_image(database_url, product_id):
+    """Return {"image_data", "image_content_type"} for an active product, or None."""
+    with transaction(database_url) as cursor:
+        cursor.execute(
+            """SELECT image_data, image_content_type FROM products
+               WHERE id = %s AND is_active = 1 AND image_data IS NOT NULL""",
+            (product_id,),
+        )
+        return cursor.fetchone()
+
+
+def get_variant_image(database_url, variant_id):
+    """Return the picture of the product an option belongs to, or None."""
+    with transaction(database_url) as cursor:
+        cursor.execute(
+            """SELECT p.image_data, p.image_content_type
                FROM product_variants AS v
                JOIN products AS p ON p.id = v.product_id
-               WHERE v.id = %s AND p.is_active = 1""",
+               WHERE v.id = %s AND p.is_active = 1 AND p.image_data IS NOT NULL""",
             (variant_id,),
         )
-        row = cursor.fetchone()
-        return row["image_path"] if row is not None else None
+        return cursor.fetchone()
 
 
 def decrement_stock(database_url, variant_id, quantity):

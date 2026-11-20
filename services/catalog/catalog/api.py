@@ -12,7 +12,7 @@ import hmac
 from decimal import Decimal, InvalidOperation
 from functools import wraps
 
-from flask import Blueprint, current_app, jsonify, request
+from flask import Blueprint, Response, current_app, jsonify, request
 
 from catalog.service import CatalogService
 
@@ -39,7 +39,7 @@ def _error(message, status):
 
 
 def _product_json(product, variants=None):
-    """Shape a product row for JSON: ISO date, no internal file path."""
+    """Shape a product row for JSON: ISO date and a URL for its picture."""
     data = {
         "id": product["id"],
         "name": product["name"],
@@ -47,6 +47,8 @@ def _product_json(product, variants=None):
         "price_cents": product["price_cents"],
         "is_active": bool(product["is_active"]),
         "created_at": product["created_at"].isoformat(),
+        # Relative to the catalog's base URL; None means "show the placeholder".
+        "image_url": f"/products/{product['id']}/image" if product["has_image"] else None,
     }
     if variants is not None:
         data["variants"] = variants
@@ -139,6 +141,29 @@ def get_product(product_id):
     return jsonify(_product_json(product, catalog.list_variants(product_id)))
 
 
+def _image_response(image):
+    """Send stored image bytes with their type; browsers may cache them 5 minutes."""
+    if image is None:
+        return _error("No image.", 404)
+    return Response(
+        image["image_data"],
+        mimetype=image["image_content_type"],
+        headers={"Cache-Control": "public, max-age=300"},
+    )
+
+
+@public_api.get("/products/<int:product_id>/image")
+def product_image(product_id):
+    """The product's picture, stored in the catalog database."""
+    return _image_response(_catalog().get_product_image(product_id))
+
+
+@public_api.get("/variants/<int:variant_id>/image")
+def variant_image(variant_id):
+    """The picture of the product an option belongs to (cart thumbnails)."""
+    return _image_response(_catalog().get_variant_image(variant_id))
+
+
 # ---------------------------------------------------------------- admin
 
 @admin_api.get("/products")
@@ -200,7 +225,6 @@ def admin_update_product(product_id):
             body.get("name", ""),
             body.get("description", ""),
             parse_price_cents(body.get("price", "")),
-            product["image_path"],
         )
     except ValueError as error:
         return _error(str(error), 400)
@@ -213,6 +237,26 @@ def admin_delete_product(product_id):
     """Hide a product from the shop; the row stays for old order snapshots."""
     if not _catalog().deactivate_product(product_id):
         return _error("Product not found or already removed.", 404)
+    return "", 204
+
+
+@admin_api.put("/products/<int:product_id>/image")
+@admin_required
+def admin_set_image(product_id):
+    """Upload or replace a product's picture: multipart form with an "image" file.
+
+    Requests over 5 MB are refused by Flask (MAX_CONTENT_LENGTH) with 413.
+    """
+    catalog = _catalog()
+    if catalog.get_product_for_admin(product_id) is None:
+        return _error("Product not found.", 404)
+    upload = request.files.get("image")
+    if upload is None or not upload.filename:
+        return _error("Choose an image file.", 400)
+    try:
+        catalog.set_product_image(product_id, upload.filename, upload.read())
+    except ValueError as error:
+        return _error(str(error), 400)
     return "", 204
 
 

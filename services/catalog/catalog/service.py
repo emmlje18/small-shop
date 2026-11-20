@@ -2,6 +2,12 @@
 
 from catalog import repository
 
+MAX_IMAGE_BYTES = 5 * 1024 * 1024
+IMAGE_TYPES = {
+    "jpg": "image/jpeg", "jpeg": "image/jpeg", "png": "image/png",
+    "gif": "image/gif", "webp": "image/webp",
+}
+
 
 class CatalogService:
     """Apply catalog validation before data reaches SQLite."""
@@ -9,7 +15,7 @@ class CatalogService:
     def __init__(self, database_url):
         self.database_url = database_url
 
-    def add_product(self, name, description, price_cents, image_path=None):
+    def add_product(self, name, description, price_cents):
         """Validate and save a product with its price in cents."""
         clean_name = name.strip() if isinstance(name, str) else ""
         if not clean_name:
@@ -23,7 +29,6 @@ class CatalogService:
             clean_name,
             description.strip(),
             price_cents,
-            image_path,
         )
 
     def list_products(self):
@@ -42,8 +47,8 @@ class CatalogService:
             return None
         return repository.get_product_for_admin(self.database_url, product_id)
 
-    def update_product(self, product_id, name, description, price_cents, image_path):
-        """Validate and update one product while keeping its current image when set."""
+    def update_product(self, product_id, name, description, price_cents):
+        """Validate and update one product's name, description and price."""
         clean_name = name.strip() if isinstance(name, str) else ""
         if not self._is_positive_integer(product_id):
             raise ValueError("Product id must be a positive integer.")
@@ -59,7 +64,6 @@ class CatalogService:
             clean_name,
             description.strip(),
             price_cents,
-            image_path,
         )
 
     def deactivate_product(self, product_id):
@@ -114,11 +118,33 @@ class CatalogService:
         """Return the stable catalog details an order must copy."""
         return repository.get_variant_snapshot(self.database_url, variant_id)
 
-    def get_variant_image_path(self, variant_id):
-        """Return the main image path for a public catalog option image."""
+    def set_product_image(self, product_id, filename, image_data):
+        """Validate an uploaded picture by extension and size, then store it."""
+        if not self._is_positive_integer(product_id):
+            raise ValueError("Product id must be a positive integer.")
+        extension = filename.rsplit(".", 1)[-1].lower() if "." in (filename or "") else ""
+        content_type = IMAGE_TYPES.get(extension)
+        if content_type is None:
+            raise ValueError("Allowed image types are JPG, PNG, GIF, and WebP.")
+        if not image_data:
+            raise ValueError("The image file is empty.")
+        if len(image_data) > MAX_IMAGE_BYTES:
+            raise ValueError("Image uploads must be smaller than 5 MB.")
+        return repository.set_product_image(
+            self.database_url, product_id, image_data, content_type
+        )
+
+    def get_product_image(self, product_id):
+        """Return the stored picture of an active product, or None."""
+        if not self._is_positive_integer(product_id):
+            return None
+        return repository.get_product_image(self.database_url, product_id)
+
+    def get_variant_image(self, variant_id):
+        """Return the picture of the product an option belongs to, or None."""
         if not self._is_positive_integer(variant_id):
             return None
-        return repository.get_variant_image_path(self.database_url, variant_id)
+        return repository.get_variant_image(self.database_url, variant_id)
 
     def decrement_stock(self, variant_id, quantity):
         """Atomically reserve stock if the requested quantity is available."""
