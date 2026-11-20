@@ -1,0 +1,12 @@
+# Tool settings for the catalog service (dependencies stay in requirements*.txt).
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["catalog"]
+
+[tool.coverage.report]
+show_missing = true
