@@ -19,7 +19,7 @@ services:
       MSSQL_PID: Developer
       MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:-LocalDev_Sa_Pass1}
     ports:
-      - "127.0.0.1:1433:1433" # host access for inspecting data; localhost only
+      - "127.0.0.1:14330:1433" # host access for inspecting data; localhost only
     volumes:
       - mssql-data:/var/opt/mssql
     healthcheck:
@@ -55,8 +55,9 @@ services:
       DATABASE_URL: mssql+pymssql://catalog_user:${CATALOG_DB_PASSWORD:-LocalDev_Catalog_1}@mssql:1433/catalog_db
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin}
       INTERNAL_TOKEN: ${INTERNAL_TOKEN:-local-internal-token}
+      CORS_ORIGINS: http://localhost:8180
     ports:
-      - "8001:8000"
+      - "8101:8000"
 
   orders:
     build: ./services/orders
@@ -67,7 +68,7 @@ services:
       PORT: "8000"
       DATABASE_URL: mssql+pymssql://orders_user:${ORDERS_DB_PASSWORD:-LocalDev_Orders_1}@mssql:1433/orders_db
     ports:
-      - "8002:8000"
+      - "8102:8000"
 
   # Stock web server with ui/ mounted read-only; not a service container.
   ui:
@@ -75,7 +76,7 @@ services:
     volumes:
       - ./ui:/usr/share/nginx/html:ro
     ports:
-      - "8080:80"
+      - "8180:80"
 
 volumes:
   mssql-data:
