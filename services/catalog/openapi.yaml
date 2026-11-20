@@ -1,0 +1,470 @@
+openapi: 3.0.3
+info:
+  title: Catalog service
+  version: "1.0.0"
+  description: |
+    Products, their options (variants) and stock for Emma's cool shop.
+
+    * Public endpoints are called by the static UI.
+    * Admin endpoints need `Authorization: Bearer <ADMIN_PASSWORD>`.
+    * Internal endpoints are the seam used by the orders service and need
+      `X-Internal-Token: <INTERNAL_TOKEN>`. They do not send CORS headers.
+
+    Money is always integer cents. Errors are `{"error": "<message>"}`.
+servers:
+  - url: http://localhost:8101
+    description: Local docker compose
+tags:
+  - name: public
+  - name: admin
+  - name: internal
+  - name: operations
+
+paths:
+  /health:
+    get:
+      tags: [operations]
+      summary: Whether this service can write and read its own database
+      operationId: health
+      responses:
+        "200":
+          description: Database reachable for writes and reads
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+              example: { status: ok, db: ok, version: 3f2c1ab }
+        "503":
+          description: Database unavailable
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Health" }
+              example: { status: error, db: unavailable, version: 3f2c1ab }
+
+  /products:
+    get:
+      tags: [public]
+      summary: List active products
+      operationId: listProducts
+      responses:
+        "200":
+          description: Active products, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Product" }
+
+  /products/{productId}:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    get:
+      tags: [public]
+      summary: One active product with its options
+      operationId: getProduct
+      responses:
+        "200":
+          description: The product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductWithVariants" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /products/{productId}/image:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    get:
+      tags: [public]
+      summary: The product's picture
+      operationId: getProductImage
+      responses:
+        "200": { $ref: "#/components/responses/Image" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /variants/{variantId}/image:
+    parameters:
+      - $ref: "#/components/parameters/VariantId"
+    get:
+      tags: [public]
+      summary: The picture of the product an option belongs to (cart thumbnails)
+      operationId: getVariantImage
+      responses:
+        "200": { $ref: "#/components/responses/Image" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/products:
+    get:
+      tags: [admin]
+      summary: List active products with their options
+      operationId: adminListProducts
+      security: [{ adminPassword: [] }]
+      responses:
+        "200":
+          description: Active products with options
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/ProductWithVariants" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+    post:
+      tags: [admin]
+      summary: Create a product with one or more options
+      operationId: adminCreateProduct
+      security: [{ adminPassword: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewProduct" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+  /admin/products/{productId}:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    get:
+      tags: [admin]
+      summary: One product, including a removed one
+      operationId: adminGetProduct
+      security: [{ adminPassword: [] }]
+      responses:
+        "200":
+          description: The product
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ProductWithVariants" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [admin]
+      summary: Change name, description and price
+      operationId: adminUpdateProduct
+      security: [{ adminPassword: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ProductUpdate" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [admin]
+      summary: Remove from the shop (soft delete; kept for old orders)
+      operationId: adminDeleteProduct
+      security: [{ adminPassword: [] }]
+      responses:
+        "204": { description: Removed }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/products/{productId}/image:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    put:
+      tags: [admin]
+      summary: Upload or replace the product's picture (JPG, PNG, GIF, WebP; under 5 MB)
+      operationId: adminSetImage
+      security: [{ adminPassword: [] }]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [image]
+              properties:
+                image: { type: string, format: binary }
+      responses:
+        "204": { description: Stored }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "413":
+          description: Upload larger than the limit
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /admin/products/{productId}/variants:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+    post:
+      tags: [admin]
+      summary: Add an option to a product
+      operationId: adminAddVariant
+      security: [{ adminPassword: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VariantInput" }
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /admin/products/{productId}/variants/{variantId}:
+    parameters:
+      - $ref: "#/components/parameters/ProductId"
+      - $ref: "#/components/parameters/VariantId"
+    put:
+      tags: [admin]
+      summary: Change an option's label and stock
+      operationId: adminUpdateVariant
+      security: [{ adminPassword: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VariantInput" }
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Id" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [admin]
+      summary: Take an option off sale (stock set to 0; id kept for old orders)
+      operationId: adminRemoveVariant
+      security: [{ adminPassword: [] }]
+      responses:
+        "204": { description: Removed from sale }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /internal/variants/{variantId}:
+    parameters:
+      - $ref: "#/components/parameters/VariantId"
+    get:
+      tags: [internal]
+      summary: Snapshot of an option that orders copies into an order item
+      operationId: getVariantSnapshot
+      security: [{ internalToken: [] }]
+      responses:
+        "200":
+          description: Current name, option, price and stock
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VariantSnapshot" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /internal/variants/{variantId}/decrement:
+    parameters:
+      - $ref: "#/components/parameters/VariantId"
+    post:
+      tags: [internal]
+      summary: Reserve stock for a checkout (atomic; never goes below zero)
+      operationId: decrementStock
+      security: [{ internalToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Quantity" }
+      responses:
+        "200":
+          description: Reserved
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [variant_id, decremented]
+                properties:
+                  variant_id: { type: integer }
+                  decremented: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+        "409":
+          description: Not enough stock
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /internal/variants/{variantId}/restore:
+    parameters:
+      - $ref: "#/components/parameters/VariantId"
+    post:
+      tags: [internal]
+      summary: Return reserved stock after a failed payment or cancellation
+      operationId: restoreStock
+      security: [{ internalToken: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/Quantity" }
+      responses:
+        "200":
+          description: Restored
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [variant_id, restored]
+                properties:
+                  variant_id: { type: integer }
+                  restored: { type: integer }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "401": { $ref: "#/components/responses/Unauthorized" }
+
+components:
+  securitySchemes:
+    adminPassword:
+      type: http
+      scheme: bearer
+      description: The admin password (ADMIN_PASSWORD) as a bearer token.
+    internalToken:
+      type: apiKey
+      in: header
+      name: X-Internal-Token
+      description: Shared secret (INTERNAL_TOKEN) known only to the orders service.
+
+  parameters:
+    ProductId:
+      name: productId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+    VariantId:
+      name: variantId
+      in: path
+      required: true
+      schema: { type: integer, minimum: 1 }
+
+  responses:
+    BadRequest:
+      description: Invalid input
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Unauthorized:
+      description: Missing or wrong password or token
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+    Image:
+      description: Image bytes
+      content:
+        image/jpeg: { schema: { type: string, format: binary } }
+        image/png: { schema: { type: string, format: binary } }
+        image/gif: { schema: { type: string, format: binary } }
+        image/webp: { schema: { type: string, format: binary } }
+
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+    Health:
+      type: object
+      required: [status, db, version]
+      properties:
+        status: { type: string, enum: [ok, error] }
+        db: { type: string, enum: [ok, unavailable] }
+        version: { type: string, description: Git commit SHA of the running image }
+    Id:
+      type: object
+      required: [id]
+      properties:
+        id: { type: integer }
+    Product:
+      type: object
+      required: [id, name, description, price_cents, is_active, created_at, image_url]
+      properties:
+        id: { type: integer }
+        name: { type: string }
+        description: { type: string }
+        price_cents: { type: integer, minimum: 0 }
+        is_active: { type: boolean }
+        created_at: { type: string, format: date-time }
+        image_url:
+          type: string
+          nullable: true
+          description: Path relative to the catalog base URL; null when there is no picture.
+    Variant:
+      type: object
+      required: [id, product_id, option_label, stock]
+      properties:
+        id: { type: integer }
+        product_id: { type: integer }
+        option_label: { type: string }
+        stock: { type: integer, minimum: 0 }
+    ProductWithVariants:
+      allOf:
+        - $ref: "#/components/schemas/Product"
+        - type: object
+          required: [variants]
+          properties:
+            variants:
+              type: array
+              items: { $ref: "#/components/schemas/Variant" }
+    VariantInput:
+      type: object
+      required: [option_label, stock]
+      properties:
+        option_label: { type: string, minLength: 1 }
+        stock: { type: integer, minimum: 0 }
+    NewProduct:
+      type: object
+      required: [name, price, variants]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        price:
+          type: string
+          description: Decimal price with at most two decimals, e.g. "12.50".
+          example: "12.50"
+        variants:
+          type: array
+          minItems: 1
+          items: { $ref: "#/components/schemas/VariantInput" }
+    ProductUpdate:
+      type: object
+      required: [name, price]
+      properties:
+        name: { type: string, minLength: 1 }
+        description: { type: string }
+        price: { type: string, example: "12.50" }
+    VariantSnapshot:
+      type: object
+      required: [variant_id, product_name, option_label, unit_price_cents, stock]
+      properties:
+        variant_id: { type: integer }
+        product_name: { type: string }
+        option_label: { type: string }
+        unit_price_cents: { type: integer, minimum: 0 }
+        stock: { type: integer, minimum: 0 }
+    Quantity:
+      type: object
+      required: [quantity]
+      properties:
+        quantity: { type: integer, minimum: 1 }
