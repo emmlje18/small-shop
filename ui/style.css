@@ -131,3 +131,5 @@ button:disabled { cursor: progress; opacity: 0.6; }
   .variant .option-row { grid-template-columns: 1fr; }
   .cart-line .line-subtotal { grid-column: 2; }
 }
+/* Product page: the picture fills its half of the card, keeping its own shape. */
+.product-detail .detail-image { width: 100%; height: auto; max-height: 640px; object-fit: contain; border-radius: 6px; }

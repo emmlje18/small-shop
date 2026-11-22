@@ -190,7 +190,7 @@ async function productPage(token, id) {
   onSubmit(form, async (data) => {
     // Orders checks the live stock in the catalog before accepting the change.
     const result = await callService("orders", "/cart/add", {
-      method: "POST",
+      method: "POST", safeToRepeat: true,
       json: { cart: loadCart(), variant_id: Number(data.variant_id), quantity: Number(data.quantity) },
     });
     saveCart(result.cart);
@@ -204,7 +204,7 @@ async function cartPage(token) {
     paint(token, '<h1>Your cart</h1><p class="panel">Your cart is empty. <a href="#/">Browse the shop</a></p>');
     return;
   }
-  const summary = await callService("orders", "/cart/summary", { method: "POST", json: { cart } });
+  const summary = await callService("orders", "/cart/summary", { method: "POST", safeToRepeat: true, json: { cart } });
 
   // Options that are no longer for sale are left out of the summary; drop
   // them from the saved cart too so checkout does not fail on them.
@@ -248,7 +248,7 @@ async function cartPage(token) {
     const variantId = Number(form.dataset.variant);
     const update = async (quantity) => {
       const result = await callService("orders", "/cart/update", {
-        method: "POST", json: { cart: loadCart(), variant_id: variantId, quantity },
+        method: "POST", safeToRepeat: true, json: { cart: loadCart(), variant_id: variantId, quantity },
       });
       saveCart(result.cart);
       go("#/cart", quantity === 0 ? "Removed." : "Cart updated.");
@@ -266,7 +266,7 @@ async function checkoutPage(token) {
     go("#/cart");
     return;
   }
-  const summary = await callService("orders", "/cart/summary", { method: "POST", json: { cart } });
+  const summary = await callService("orders", "/cart/summary", { method: "POST", safeToRepeat: true, json: { cart } });
   paint(token, `
     <h1>Checkout</h1>
     <div class="checkout-layout">
@@ -296,7 +296,7 @@ async function checkoutPage(token) {
   onSubmit(app.querySelector("#checkout"), async (data) => {
     try {
       const result = await callService("orders", "/checkout", {
-        method: "POST", retryOnlyOn503: true, json: { cart: loadCart(), ...data },
+        method: "POST", json: { cart: loadCart(), ...data },
       });
       saveCart([]);
       go(`#/order/${result.order_id}?email=${encodeURIComponent(data.customer_email.trim())}`,

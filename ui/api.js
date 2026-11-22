@@ -2,11 +2,17 @@
 //
 // Both services scale to zero and their databases pause when idle, so the
 // first request after a quiet period can take up to about a minute (a "cold
-// start"). Requests that fail in a way a cold start explains (no answer,
-// timeout, 502/503/504) are retried for up to two minutes while the page shows
-// "the shop is starting up". If a service still does not answer, the call
-// fails with a ServiceError that names the service, so each page can say
-// which part of the shop is unavailable and what still works.
+// start"). Whenever a request takes more than a few seconds the page says
+// "the shop is starting up", so a slow answer never looks like a frozen page.
+//
+// Reads (and the cart price checks, which change nothing) are retried while
+// the service wakes up. Saves are sent once and given time to finish; they are
+// only sent again when the service answered that it did not handle them
+// (502/503), so a slow save can never create a product or an order twice.
+//
+// If a service still does not answer, the call fails with a ServiceError that
+// names the service, so each page can say which part of the shop is
+// unavailable and what still works.
 
 const SHOP_CONFIG = window.SHOP_CONFIG || {};
 const SERVICE_URLS = {
@@ -14,7 +20,9 @@ const SERVICE_URLS = {
   orders: (SHOP_CONFIG.ordersUrl || "").replace(/\/$/, ""),
 };
 
-const ATTEMPT_TIMEOUT_MS = 30000; // give up on one attempt after 30 s
+const SLOW_NOTICE_MS = 3000; // show "starting up" when a request takes longer
+const READ_TIMEOUT_MS = 30000; // give up on one read attempt after 30 s
+const SAVE_TIMEOUT_MS = 100000; // a save gets 100 s: enough for a full cold start
 const WAIT_BUDGET_MS = 120000; // keep retrying for up to 2 minutes in total
 const RETRY_DELAYS_MS = [2000, 4000, 6000, 10000, 15000];
 
@@ -44,9 +52,9 @@ function sleep(ms) {
 
 // One HTTP attempt with a timeout. Returns {status, body} or throws when
 // there was no answer (network error or timeout).
-async function attempt(url, options) {
+async function attempt(url, options, timeoutMs) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), ATTEMPT_TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
     const response = await fetch(url, { ...options, signal: controller.signal });
     const type = response.headers.get("Content-Type") || "";
@@ -64,11 +72,10 @@ async function attempt(url, options) {
 //   options   fetch options; plus
 //             json: an object to send as the JSON body
 //             admin: true to send the admin password
-//             retryOnlyOn503: for checkout, which must not be sent twice.
-//               A 503 from orders means nothing was charged, so it is safe to
-//               retry; a lost answer is not, because the order may exist.
+//             safeToRepeat: true for a POST that changes nothing (the cart
+//               price checks), so it may be retried like a read
 async function callService(service, path, options = {}) {
-  const { json, admin, retryOnlyOn503, ...fetchOptions } = options;
+  const { json, admin, safeToRepeat, ...fetchOptions } = options;
   const headers = { ...(fetchOptions.headers || {}) };
   if (json !== undefined) {
     headers["Content-Type"] = "application/json";
@@ -77,43 +84,51 @@ async function callService(service, path, options = {}) {
   if (admin) {
     headers.Authorization = `Bearer ${adminPassword()}`;
   }
+  const method = (fetchOptions.method || "GET").toUpperCase();
+  const repeatable = safeToRepeat || method === "GET";
+  const retryOn = repeatable ? [0, 502, 503, 504] : [502, 503];
   const url = SERVICE_URLS[service] + path;
   const started = Date.now();
+
   let waiting = false;
+  const notice = () => {
+    if (!waiting) {
+      waiting = true;
+      waitListeners.start(service);
+    }
+  };
+  const slowTimer = setTimeout(notice, SLOW_NOTICE_MS);
 
   try {
     for (let tries = 0; ; tries += 1) {
       let result = null;
       try {
-        result = await attempt(url, { ...fetchOptions, headers });
+        result = await attempt(url, { ...fetchOptions, headers },
+          repeatable ? READ_TIMEOUT_MS : SAVE_TIMEOUT_MS);
       } catch (networkError) {
         result = null; // no answer: the service may be starting
       }
 
       const status = result ? result.status : 0;
       const body = (result && result.body) || {};
-      const retryable = retryOnlyOn503 ? status === 503 : [0, 502, 503, 504].includes(status);
 
-      if (!retryable) {
+      if (!retryOn.includes(status) || Date.now() - started > WAIT_BUDGET_MS) {
         if (status >= 200 && status < 300) return result.body;
-        throw new ServiceError(service, status, body.error || `Request failed (${status}).`, body, false);
-      }
-
-      if (Date.now() - started > WAIT_BUDGET_MS) {
+        const unavailable = [0, 502, 503, 504].includes(status);
         // Orders answering "catalog unavailable" means the catalog is the
         // part that is down, not orders.
         const failed = status === 503 && service === "orders" &&
           String(body.error || "").toLowerCase().includes(CATALOG_DOWN_TEXT) ? "catalog" : service;
-        throw new ServiceError(failed, status, body.error || `The ${failed} service is not responding.`, body, true);
+        const message = body.error || (unavailable
+          ? `The ${failed} service is not responding.` : `Request failed (${status}).`);
+        throw new ServiceError(failed, status, message, body, unavailable);
       }
 
-      if (!waiting) {
-        waiting = true;
-        waitListeners.start(service);
-      }
+      notice();
       await sleep(RETRY_DELAYS_MS[Math.min(tries, RETRY_DELAYS_MS.length - 1)]);
     }
   } finally {
+    clearTimeout(slowTimer);
     if (waiting) waitListeners.stop(service);
   }
 }
