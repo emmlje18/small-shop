@@ -188,7 +188,8 @@ jobs:
           printf 'window.SHOP_CONFIG = {\n  catalogUrl: "%s",\n  ordersUrl: "%s"\n};\n' \
             "$CATALOG_URL" "$ORDERS_URL" > ui/config.js
           az storage blob upload-batch --account-name "$STORAGE_ACCOUNT" --auth-mode key \
-            --destination '$web' --source ui --overwrite --only-show-errors -o none
+            --destination '$web' --source ui --overwrite --only-show-errors -o none \
+            --content-cache-control "no-cache"  # browsers check for a newer version each visit
           echo "UI uploaded to $UI_ORIGIN"
 
       # Both apps scale to zero and the databases pause after an hour idle, so
