@@ -121,3 +121,50 @@ def test_failed_migration_is_rolled_back_and_not_recorded(database_url, tmp_path
         connection.commit()
     finally:
         connection.close()
+
+
+def test_migration_004_keeps_existing_products(tmp_path):
+    """Build a database at migration 003, add products, then apply 004.
+
+    004 changes a table that already holds data: every product must survive
+    unchanged, with version 1 if it had a picture and 0 if not.
+    """
+    from tests.conftest import TEST_DATABASE_URL
+
+    settings = db.connection_settings(TEST_DATABASE_URL)
+    name = settings["database"].removesuffix("_test") + "_m004_test"
+    admin = pymssql.connect(**{**settings, "database": "master"}, autocommit=True, login_timeout=30)
+    admin.cursor().execute(f"IF DB_ID(N'{name}') IS NOT NULL DROP DATABASE [{name}]; CREATE DATABASE [{name}]")
+    url = TEST_DATABASE_URL.rsplit("/", 1)[0] + f"/{name}"
+    try:
+        for path in sorted(MIGRATIONS_DIR.glob("00[1-3]_*.sql")):
+            (tmp_path / path.name).write_text(path.read_text(encoding="utf-8"), encoding="utf-8")
+        connection = db.connect(url)
+        try:
+            migrate(connection, tmp_path)
+        finally:
+            connection.close()
+        with transaction(url) as cursor:
+            cursor.execute("""INSERT INTO products (name, price_cents, image_data, image_content_type)
+                              VALUES ('With picture', 200, 0x89504E47, 'image/png'),
+                                     ('No picture', 300, NULL, NULL)""")
+
+        (tmp_path / "004_image_version.sql").write_text(
+            (MIGRATIONS_DIR / "004_image_version.sql").read_text(encoding="utf-8"), encoding="utf-8")
+        connection = db.connect(url)
+        try:
+            assert migrate(connection, tmp_path) == ["004_image_version.sql"]
+        finally:
+            connection.close()
+
+        with transaction(url) as cursor:
+            cursor.execute("SELECT name, price_cents, image_data, image_version FROM products ORDER BY name")
+            rows = cursor.fetchall()
+        assert rows == [
+            {"name": "No picture", "price_cents": 300, "image_data": None, "image_version": 0},
+            {"name": "With picture", "price_cents": 200, "image_data": b"\x89PNG", "image_version": 1},
+        ]
+    finally:
+        admin.cursor().execute(
+            f"ALTER DATABASE [{name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; DROP DATABASE [{name}]")
+        admin.close()

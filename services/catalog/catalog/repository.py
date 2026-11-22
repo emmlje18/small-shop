@@ -7,8 +7,9 @@ transaction (see db.transaction). Values are always passed as parameters
 
 from catalog.db import transaction
 
-# has_image says whether a picture exists without loading its bytes.
-PRODUCT_COLUMNS = """id, name, description, price_cents, is_active, created_at,
+# has_image says whether a picture exists without loading its bytes;
+# image_version goes up each time the picture is replaced (migration 004).
+PRODUCT_COLUMNS = """id, name, description, price_cents, is_active, created_at, image_version,
     CAST(CASE WHEN image_data IS NULL THEN 0 ELSE 1 END AS BIT) AS has_image"""
 
 
@@ -139,7 +140,8 @@ def set_product_image(database_url, product_id, image_data, content_type):
     """Store an uploaded picture on the product row, replacing any earlier one."""
     with transaction(database_url) as cursor:
         cursor.execute(
-            """UPDATE products SET image_data = %s, image_content_type = %s
+            """UPDATE products SET image_data = %s, image_content_type = %s,
+                      image_version = image_version + 1
                WHERE id = %s""",
             (image_data, content_type, product_id),
         )
