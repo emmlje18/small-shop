@@ -149,7 +149,14 @@ def test_image_upload_and_serving(client, product):
     assert served.mimetype == "image/png"
     assert served.data == png
     assert client.get(f"/variants/{product['variants'][0]['id']}/image").data == png
-    assert client.get(f"/products/{product['id']}").get_json()["image_url"] == f"/products/{product['id']}/image"
+    first_url = client.get(f"/products/{product['id']}").get_json()["image_url"]
+    assert first_url == f"/products/{product['id']}/image?v=1"
+    assert client.get(first_url).headers["Cache-Control"] == "public, max-age=86400"
+    assert served.headers["Cache-Control"] == "no-cache"
+
+    # Replacing the picture gives it a new URL, so browsers do not show the old one.
+    assert client.put(url, headers=ADMIN, data={"image": (io.BytesIO(png), "b.png")}).status_code == 204
+    assert client.get(f"/products/{product['id']}").get_json()["image_url"] == f"/products/{product['id']}/image?v=2"
 
 
 def test_upload_over_the_limit_is_refused_with_413(client, product):

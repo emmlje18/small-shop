@@ -48,7 +48,10 @@ def _product_json(product, variants=None):
         "is_active": bool(product["is_active"]),
         "created_at": product["created_at"].isoformat(),
         # Relative to the catalog's base URL; None means "show the placeholder".
-        "image_url": f"/products/{product['id']}/image" if product["has_image"] else None,
+        # ?v= changes whenever the picture is replaced, so browsers fetch the
+        # new one instead of a cached copy.
+        "image_url": (f"/products/{product['id']}/image?v={product['image_version']}"
+                      if product["has_image"] else None),
     }
     if variants is not None:
         data["variants"] = variants
@@ -142,13 +145,19 @@ def get_product(product_id):
 
 
 def _image_response(image):
-    """Send stored image bytes with their type; browsers may cache them 5 minutes."""
+    """Send stored image bytes with their type.
+
+    A request with ?v=<image_version> names one exact picture, so browsers may
+    keep it for a day; a replaced picture gets a new version and a new URL.
+    Without a version (cart thumbnails) browsers must check every time.
+    """
     if image is None:
         return _error("No image.", 404)
+    cache = "public, max-age=86400" if request.args.get("v") else "no-cache"
     return Response(
         image["image_data"],
         mimetype=image["image_content_type"],
-        headers={"Cache-Control": "public, max-age=300"},
+        headers={"Cache-Control": cache},
     )
 
 

@@ -75,7 +75,16 @@ paths:
     get:
       tags: [public]
       summary: The product's picture
+      description: |
+        With ?v=<version> (as in image_url) the response may be cached for a
+        day; without it, browsers must check for a newer picture every time.
       operationId: getProductImage
+      parameters:
+        - name: v
+          in: query
+          required: false
+          description: The picture's version, from image_url.
+          schema: { type: integer, minimum: 0 }
       responses:
         "200": { $ref: "#/components/responses/Image" }
         "404": { $ref: "#/components/responses/NotFound" }
@@ -409,7 +418,10 @@ components:
         image_url:
           type: string
           nullable: true
-          description: Path relative to the catalog base URL; null when there is no picture.
+          description: |
+            Path relative to the catalog base URL, ending in ?v=<version>; the
+            version goes up whenever the picture is replaced. null when there
+            is no picture.
     Variant:
       type: object
       required: [id, product_id, option_label, stock]
