@@ -4,9 +4,26 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Emma's cool shop</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>Emma's cool shop</h1>
-  <p>Placeholder: the static UI replaces the server-rendered pages in a later step.</p>
+  <header class="topbar">
+    <a href="#/">Emma's cool shop</a>
+    <nav class="shop-navigation">
+      <a class="topbar-link" href="#/cart">Cart (<span id="cart-count">0</span>)</a>
+      <a class="topbar-link" href="#/admin">Admin</a>
+    </nav>
+  </header>
+
+  <!-- Messages about the services: "starting up" and partial failures. -->
+  <div id="status" class="page shop-page" aria-live="polite"></div>
+
+  <!-- app.js draws the current page in here. -->
+  <main id="app" class="page shop-page"><p>Loading…</p></main>
+
+  <!-- config.js says where the two services are (written at deploy time). -->
+  <script src="config.js"></script>
+  <script src="api.js"></script>
+  <script src="app.js"></script>
 </body>
 </html>
