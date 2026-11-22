@@ -1,0 +1,12 @@
+# Tool settings for the orders service (dependencies stay in requirements*.txt).
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["orders"]
+
+[tool.coverage.report]
+show_missing = true

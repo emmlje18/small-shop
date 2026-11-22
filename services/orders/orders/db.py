@@ -3,6 +3,7 @@
 import logging
 import os
 import time
+from contextlib import contextmanager
 from urllib.parse import unquote, urlparse
 
 import pymssql
@@ -29,10 +30,14 @@ def connection_settings(database_url):
     }
 
 
-def connect(database_url=None):
-    """Open a connection, retrying with growing waits while the database is unreachable."""
+def connect(database_url=None, retry=True):
+    """Open a connection, retrying with growing waits while the database is unreachable.
+
+    retry=False tries once; /health uses it so it answers quickly instead of
+    waiting through the whole retry schedule.
+    """
     settings = connection_settings(database_url or os.environ["DATABASE_URL"])
-    attempts = len(RETRY_DELAYS_S) + 1
+    attempts = len(RETRY_DELAYS_S) + 1 if retry else 1
     for attempt in range(1, attempts + 1):
         try:
             return pymssql.connect(**settings, login_timeout=10, timeout=30)
@@ -45,3 +50,22 @@ def connect(database_url=None):
                 attempt, attempts, error, delay,
             )
             time.sleep(delay)
+
+
+@contextmanager
+def transaction(database_url=None, retry=True):
+    """Give a cursor that returns rows as dicts; commit on success, roll back on error.
+
+    Every repository function uses this, so each one is a single unit of work:
+    either all of its SQL is saved or none of it is.
+    """
+    connection = connect(database_url, retry=retry)
+    try:
+        cursor = connection.cursor(as_dict=True)
+        yield cursor
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()

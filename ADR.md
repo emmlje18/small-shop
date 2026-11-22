@@ -39,3 +39,19 @@ Context: The shop needs a checkout outcome so it can demonstrate paid and cancel
 Decision: Use `FakePaymentProvider` inside the same process. Its `charge()` method declines card numbers ending in `0000` and returns a generated fake reference for other card numbers.
 Alternatives considered: Integrate Stripe or another real payment provider. That would add an external runtime dependency and would require handling real credentials and payment data, which is outside the assignment scope.
 Consequences: Checkout can exercise success and failure paths without processing real money or storing card numbers. A later real integration could replace `FakePaymentProvider` while keeping `OrderService` dependent on the same `charge()` operation.
+
+## [6]. Split into catalog and orders services along the ADR-2 seam
+Date: 2026-11-20
+Status: Decided
+Context: Assignment 2 needs one service per domain, each with its own database, talking over HTTP, with a static UI on a different website.
+Decision: Catalog owns products and variants; orders owns orders and order items. ADR-2's three operations become catalog endpoints (`/internal/variants/{id}`, `/decrement`, `/restore`) that orders calls with a secret `X-Internal-Token`. Checkout stays in orders and calls catalog on the server. Images move into the catalog database, admin sends its password in a header, and the cart moves to the browser, because container disks are wiped and cross-site cookies are blocked.
+Alternatives considered: Checkout in the UI calling both services, but a closed tab could skip giving stock back. Image URLs instead of uploads, but that drops the upload feature.
+Consequences: ADR-2 held, and no table had to move. Checkout now spans two databases, so orders must give stock back itself when payment fails. The internal endpoints are public and rely on the token.
+
+## [7]. One database per service, versioned SQL migrations, forward-only recovery
+Date: 2026-11-21
+Status: Decided
+Context: The monolith kept all four tables in one SQLite file and created them on first boot. Now each service needs its own SQL Server database, and the schema must change in place once real data exists.
+Decision: Catalog's database holds `products` and `product_variants`; orders' database holds `orders` and `order_items`. Each service has numbered SQL files (`migrations/001_init.sql`, `002_...`) and a small runner that records applied files in `schema_migrations`, runs only new ones in order, and commits each file with its record in one transaction. The Dockerfile runs it once before gunicorn starts. The Assignment 1 SQLite data is not copied; the new databases start empty.
+Alternatives considered: A migration tool such as Alembic, which adds a dependency and hides the SQL I need to explain. Creating tables on every boot, which cannot change a table that already has data.
+Consequences: The foreign key from `order_items.variant_id` to the catalog is gone, so the database no longer checks it; orders only stores ids it got from catalog at checkout, and saves the product name and price as a snapshot so old orders stay readable. A failed migration rolls back and stops the container, so the old revision keeps serving. Applied files are never edited: a bad migration is fixed by a new migration, or in the worst case by Azure SQL's point-in-time restore.

@@ -1,17 +1,65 @@
-name: CI
+name: CI/CD
 
+# CI on every push and pull request: lint, test with coverage, build images.
+# CD only on a push to main, and only if every CI job passed on that commit.
 on:
   push:
   pull_request:
 
 permissions:
   contents: read
-  packages: write # needed to push images to GHCR with GITHUB_TOKEN
 
 jobs:
+  test:
+    name: Test (${{ matrix.service }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [catalog, orders]
+    defaults:
+      run:
+        working-directory: services/${{ matrix.service }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: services/${{ matrix.service }}/requirements*.txt
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Lint
+        run: ruff check .
+
+      # A throwaway SQL Server for the tests. Its password is generated for this
+      # run only, so no password is written in the repository. CI never
+      # connects to Azure SQL.
+      - name: Start SQL Server
+        run: |
+          SA_PASSWORD="Ci_$(openssl rand -hex 16)"
+          echo "::add-mask::$SA_PASSWORD"
+          docker run -d --name mssql -e ACCEPT_EULA=Y -e MSSQL_SA_PASSWORD="$SA_PASSWORD" \
+            -p 1433:1433 mcr.microsoft.com/mssql/server:2022-latest
+          for i in $(seq 1 60); do
+            docker exec mssql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "$SA_PASSWORD" \
+              -C -b -Q "SELECT 1" >/dev/null 2>&1 && break
+            sleep 2
+          done
+          echo "TEST_DATABASE_URL=mssql+pymssql://sa:${SA_PASSWORD}@localhost:1433/${{ matrix.service }}_test" >> "$GITHUB_ENV"
+
+      - name: Test with coverage (fails under 70%)
+        run: pytest --cov --cov-report=term-missing --cov-fail-under=70
+
   images:
     name: Image (${{ matrix.service }})
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push images to GHCR with GITHUB_TOKEN
     strategy:
       fail-fast: false
       matrix:
@@ -43,3 +91,118 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,scope=${{ matrix.service }},mode=max
+
+  deploy:
+    name: Deploy to Azure
+    needs: [test, images]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # sign in to Azure with OpenID Connect, no stored password
+    concurrency: deploy-production
+    env:
+      RG: rg-ejliu-exstudents2026
+      ENVIRONMENT: ejliu-exstudents2026-env
+      SQL_HOST: ejliu-exstudents2026-sql.database.windows.net
+      STORAGE_ACCOUNT: ejliuexstudents2026ui
+      UI_ORIGIN: https://ejliuexstudents2026ui.z28.web.core.windows.net
+      REGISTRY: ghcr.io/${{ github.repository_owner }}
+      TAG: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Sign in to Azure (managed identity, OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy catalog and orders to Container Apps
+        env:
+          CATALOG_DB_PASSWORD: ${{ secrets.CATALOG_DB_PASSWORD }}
+          ORDERS_DB_PASSWORD: ${{ secrets.ORDERS_DB_PASSWORD }}
+          ADMIN_PASSWORD: ${{ secrets.ADMIN_PASSWORD }}
+          INTERNAL_TOKEN: ${{ secrets.INTERNAL_TOKEN }}
+        run: |
+          set -euo pipefail
+          az extension add --name containerapp --upgrade -y --only-show-errors
+
+          # deploy <app> <image>; secrets and plain settings come from the
+          # SECRETS and SETTINGS arrays. Secret values are stored as Container
+          # Apps secrets and reached through secretref:, never as plain env vars.
+          deploy() {
+            local app="$1" image="$2"
+            if az containerapp show -g "$RG" -n "$app" -o none 2>/dev/null; then
+              az containerapp secret set -g "$RG" -n "$app" --secrets "${SECRETS[@]}" -o none
+              az containerapp update -g "$RG" -n "$app" --image "$image" \
+                --min-replicas 0 --max-replicas 1 --set-env-vars "${SETTINGS[@]}" -o none
+            else
+              az containerapp create -g "$RG" -n "$app" --environment "$ENVIRONMENT" \
+                --image "$image" --ingress external --target-port 8000 \
+                --min-replicas 0 --max-replicas 1 --cpu 0.25 --memory 0.5Gi \
+                --secrets "${SECRETS[@]}" --env-vars "${SETTINGS[@]}" -o none
+            fi
+          }
+
+          SECRETS=(
+            "database-url=mssql+pymssql://catalog_user:${CATALOG_DB_PASSWORD}@${SQL_HOST}:1433/ejliu-exstudents2026-catalog-db"
+            "admin-password=${ADMIN_PASSWORD}"
+            "internal-token=${INTERNAL_TOKEN}"
+          )
+          SETTINGS=(
+            PORT=8000
+            DATABASE_URL=secretref:database-url
+            ADMIN_PASSWORD=secretref:admin-password
+            INTERNAL_TOKEN=secretref:internal-token
+            "CORS_ORIGINS=${UI_ORIGIN}"
+          )
+          deploy ejliu-exstudents2026-catalog "$REGISTRY/small-shop-catalog:$TAG"
+          CATALOG_URL="https://$(az containerapp show -g "$RG" -n ejliu-exstudents2026-catalog \
+            --query properties.configuration.ingress.fqdn -o tsv)"
+
+          SECRETS=(
+            "database-url=mssql+pymssql://orders_user:${ORDERS_DB_PASSWORD}@${SQL_HOST}:1433/ejliu-exstudents2026-orders-db"
+            "internal-token=${INTERNAL_TOKEN}"
+          )
+          SETTINGS=(
+            PORT=8000
+            DATABASE_URL=secretref:database-url
+            INTERNAL_TOKEN=secretref:internal-token
+            "CATALOG_URL=${CATALOG_URL}"
+            CATALOG_TIMEOUT_S=15
+            "CORS_ORIGINS=${UI_ORIGIN}"
+          )
+          deploy ejliu-exstudents2026-orders "$REGISTRY/small-shop-orders:$TAG"
+          ORDERS_URL="https://$(az containerapp show -g "$RG" -n ejliu-exstudents2026-orders \
+            --query properties.configuration.ingress.fqdn -o tsv)"
+
+          echo "CATALOG_URL=$CATALOG_URL" >> "$GITHUB_ENV"
+          echo "ORDERS_URL=$ORDERS_URL" >> "$GITHUB_ENV"
+
+      - name: Upload the UI to the static website
+        run: |
+          set -euo pipefail
+          # The services' URLs are configuration, written at deploy time.
+          printf 'window.SHOP_CONFIG = {\n  catalogUrl: "%s",\n  ordersUrl: "%s"\n};\n' \
+            "$CATALOG_URL" "$ORDERS_URL" > ui/config.js
+          az storage blob upload-batch --account-name "$STORAGE_ACCOUNT" --auth-mode key \
+            --destination '$web' --source ui --overwrite --only-show-errors -o none
+          echo "UI uploaded to $UI_ORIGIN"
+
+      # Both apps scale to zero and the databases pause after an hour idle, so
+      # the first request may wait for a cold start plus a database resume
+      # (about a minute). Allow up to 6 minutes before failing the run.
+      - name: Check /health on both services
+        run: |
+          for url in "$CATALOG_URL" "$ORDERS_URL"; do
+            for i in $(seq 1 24); do
+              code=$(curl -s -o /tmp/health.json -w '%{http_code}' --max-time 60 "$url/health" || true)
+              echo "$url/health -> $code $(cat /tmp/health.json 2>/dev/null)"
+              [ "$code" = "200" ] && grep -q "\"version\":\"$TAG\"" /tmp/health.json && continue 2
+              sleep 15
+            done
+            echo "::error::$url/health did not return 200 with version $TAG"
+            exit 1
+          done
