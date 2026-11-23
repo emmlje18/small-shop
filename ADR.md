@@ -2,7 +2,7 @@
 
 ## [1]. Use Flask and SQLite in one local process
 Date: 2026-10-06
-Status: Decided
+Status: Superseded by [6] and [7]
 Context: The assignment requires a small monolithic application that starts with one command, uses SQLite, and can later run in one container. The project also needs to be simple enough to explain during a closed-book comprehension check.
 Decision: Use Python with Flask for the web app and the standard-library `sqlite3` module for persistence. Keep the app in one process and organize catalog and orders as separate folders inside the same application.
 Alternatives considered: A larger framework such as Django would include features this small shop does not need; a separate database server would violate the single-container storage requirement.
@@ -26,7 +26,7 @@ Consequences: Old orders retain the original product details and price even if t
 
 ## [4]. Test domain rules with pytest and temporary SQLite files
 Date: 2026-10-10
-Status: Decided
+Status: Superseded by [9]
 Context: The assignment requires at least 70% coverage of core business logic. Cart and checkout rules include stock changes that are difficult to confirm reliably through manual browser testing alone.
 Decision: Use `pytest` and `pytest-cov` for service, repository, and fake-payment tests. Use a separate temporary SQLite database for each database test and an in-memory fake catalog for order-service tests.
 Alternatives considered: Test only through Flask pages or manually in the browser. Those approaches would make it harder to test failure paths such as overselling and payment failure, and would focus coverage on routes instead of business rules.
@@ -63,3 +63,19 @@ Context: The two services, their databases and the UI must run on Azure for Stud
 Decision: Both services run on Container Apps (Consumption) with 0.25 vCPU, 0.5 GiB, minimum 0 and maximum 1 replica. Each has its own serverless Azure SQL database on one server, on the free offer (auto-pause after 60 minutes). The UI is a Storage static website and images are on GHCR (public). The environment sends no logs to Log Analytics, which would cost money; I read the live console with `az containerapp logs show`. Cost: the free monthly allowances (Container Apps 180,000 vCPU-seconds and 2 million requests; SQL 100,000 vCore-seconds per database) cover this shop, so only storage costs a few cents.
 Alternatives considered: Keeping one replica always on, which removes cold starts but uses the free allowance all month. An App Service plan or a provisioned database, which cost money every hour even when idle.
 Consequences: The first request after about 5 idle minutes starts the container, and after an hour the database is also paused and takes up to a minute to resume. The services retry the connection up to 9 times with growing pauses (1 to 15 s), orders waits 15 s for the catalog on Azure instead of 5, the UI shows "the shop is starting up" and never re-sends a save, and the deploy waits up to 6 minutes for /health. Migrations run at startup before gunicorn, which is safe only because there is at most one replica. At 100x traffic: keep one replica warm, allow more replicas and move migrations to a separate job that runs once per deploy, move pictures to Blob Storage behind a CDN, and leave the free offer for a database sized for the load.
+
+## [9]. CI gates on lint, tests against SQL Server, coverage, valid documents and image builds
+Date: 2026-11-23
+Status: Decided
+Context: Code reaches main only through pull requests, and every push to main deploys to Azure, so a broken change must be stopped before it is merged.
+Decision: On every push and pull request, CI runs ruff, then each service's tests against a throwaway SQL Server 2022 container with a new random password per run, and fails below 70% coverage. It validates system.yaml against the provided schema, both openapi.yaml files against the OpenAPI specification, and checks that the endpoints orders calls exist in the catalog's document. It builds both images. Deploy runs only on main and only if all of this passed on the same commit. The cross-seam test starts a small stub catalog, a real HTTP server in a thread that follows the catalog's OpenAPI document, and runs the real orders app, its HTTP client and the orders database against it: paid, declined (stock given back), sold out, catalog stopped (503, but old orders still readable), catalog too slow (times out) and wrong token.
+Alternatives considered: SQLite for tests, which is faster but has a different SQL dialect than production. Running the real catalog in the orders tests, which ties the two services' test suites together and makes failures harder to locate.
+Consequences: Tests use the same database engine as Azure, so dialect mistakes show up in CI. The stub can drift from the real catalog; the endpoint check catches renamed paths but not changed response shapes. Deliberately not tested in CI: the static UI (I clicked through it with a headless browser locally), Azure-only behaviour such as cold starts and sign-in, which the post-deploy /health check covers, and load.
+
+## [10]. Not built: a message queue for giving stock back
+Date: 2026-11-23
+Status: Not built
+Context: When a payment is declined, orders gives the reserved stock back to the catalog over HTTP. If the catalog is down at that moment, orders logs "Could not restore" and the units stay missing from stock until an admin corrects it.
+Decision: Do not add a message broker such as Azure Service Bus with a background worker. They are out of scope (§1c), add a fixed monthly cost or a third container, and a decline during a catalog outage is rare in a small shop.
+Alternatives considered: A queue that orders writes "give back 2 of variant 7" to and a worker that retries until the catalog answers. An outbox table in the orders database that a timer retries, which needs a background job runner, also out of scope.
+Consequences: Rarely, stock is lower than it should be until fixed by hand; the log line shows which variant and how many. Worth building when orders are frequent enough that this happens more than occasionally, or when stock must always be exact, for example for limited items.
