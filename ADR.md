@@ -72,3 +72,10 @@ Decision: On every push and pull request, CI runs ruff, then each service's test
 Alternatives considered: SQLite for tests, which is faster but has a different SQL dialect than production. Running the real catalog in the orders tests, which ties the two services' test suites together and makes failures harder to locate.
 Consequences: Tests use the same database engine as Azure, so dialect mistakes show up in CI. The stub can drift from the real catalog; the endpoint check catches renamed paths but not changed response shapes. Deliberately not tested in CI: the static UI (I clicked through it with a headless browser locally), Azure-only behaviour such as cold starts and sign-in, which the post-deploy /health check covers, and load.
 
+## [10]. Not built: a message queue for giving stock back
+Date: 2026-11-23
+Status: Not built
+Context: When a payment is declined, orders gives the reserved stock back to the catalog over HTTP. If the catalog is down at that moment, orders logs "Could not restore" and the units stay missing from stock until an admin corrects it.
+Decision: Do not add a message broker such as Azure Service Bus with a background worker. They are out of scope (§1c), add a fixed monthly cost or a third container, and a decline during a catalog outage is rare in a small shop.
+Alternatives considered: A queue that orders writes "give back 2 of variant 7" to and a worker that retries until the catalog answers. An outbox table in the orders database that a timer retries, which needs a background job runner, also out of scope.
+Consequences: Rarely, stock is lower than it should be until fixed by hand; the log line shows which variant and how many. Worth building when orders are frequent enough that this happens more than occasionally, or when stock must always be exact, for example for limited items.
