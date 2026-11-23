@@ -79,8 +79,10 @@ function onSubmit(form, action) {
 
 waitListeners.start = () => {
   statusArea.innerHTML = `<p class="message info"><span class="spinner"></span>
-    The shop is starting up. It sleeps when nobody is using it, so the first
-    visit can take up to a minute. Please wait…</p>`;
+    <strong>The shop is starting up, please wait.</strong> To stay free it
+    sleeps when nobody is using it. Waking up usually takes 10–20 seconds, and
+    up to 2 minutes if nobody has visited for over an hour. This page will load
+    by itself; there is no need to refresh.</p>`;
 };
 waitListeners.stop = () => { statusArea.innerHTML = ""; };
 
