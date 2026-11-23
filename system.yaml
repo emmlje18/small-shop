@@ -1,0 +1,64 @@
+# yaml-language-server: $schema=./system.schema.json
+student: ejliu.exstudents2026
+prefix: ejliu-exstudents2026
+public_url: https://ejliuexstudents2026ui.z28.web.core.windows.net
+ui:
+  path: ui
+  storage_account: ejliuexstudents2026ui
+  calls: [catalog, orders]
+azure:
+  resource_group: rg-ejliu-exstudents2026
+  container_apps_environment: ejliu-exstudents2026-env
+  sql_server: ejliu-exstudents2026-sql
+  registry: ghcr.io/emmlje18
+services:
+  catalog:
+    description: Products, their options and stock, product pictures, and the admin product management.
+    path: services/catalog
+    openapi: services/catalog/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/catalog/migrations
+    env:
+      PORT: { default: 8000, description: "Port the service listens on" }
+      DATABASE_URL: { secret: true, description: "Connection string of the catalog database (mssql+pymssql://catalog_user:...)" }
+      ADMIN_PASSWORD: { secret: true, description: "Password for the admin endpoints, sent as Authorization Bearer" }
+      INTERNAL_TOKEN: { secret: true, description: "Shared token the orders service sends as X-Internal-Token to /internal endpoints" }
+      CORS_ORIGINS: { default: "", description: "Comma-separated browser origins allowed to call the API (the UI's URL)" }
+      GIT_SHA: { default: dev, description: "Commit the image was built from, reported by /health; set at image build time" }
+    calls: []
+    azure:
+      container_app: ejliu-exstudents2026-catalog
+      sql_database: ejliu-exstudents2026-catalog-db
+  orders:
+    description: Cart pricing, checkout with the fake payment provider, and orders.
+    path: services/orders
+    openapi: services/orders/openapi.yaml
+    port_default: 8000
+    health: /health
+    migrations: services/orders/migrations
+    env:
+      PORT: { default: 8000, description: "Port the service listens on" }
+      DATABASE_URL: { secret: true, description: "Connection string of the orders database (mssql+pymssql://orders_user:...)" }
+      CATALOG_URL: { default: "http://catalog:8000", description: "Base URL of the catalog service" }
+      CATALOG_TIMEOUT_S: { default: 5, description: "Timeout in seconds for each call to the catalog (15 on Azure, where the catalog may be waking from zero)" }
+      INTERNAL_TOKEN: { secret: true, description: "Shared token sent as X-Internal-Token on calls to the catalog's /internal endpoints" }
+      CORS_ORIGINS: { default: "", description: "Comma-separated browser origins allowed to call the API (the UI's URL)" }
+      GIT_SHA: { default: dev, description: "Commit the image was built from, reported by /health; set at image build time" }
+    calls:
+      - service: catalog
+        url_env: CATALOG_URL
+        endpoints:
+          - "GET /internal/variants/{variantId}"
+          - "POST /internal/variants/{variantId}/decrement"
+          - "POST /internal/variants/{variantId}/restore"
+        timeout_s: 5
+        on_failure: >-
+          Cart pricing, cart changes and checkout answer 503 "catalog unavailable"
+          and nothing is charged; stock already reserved in the checkout is given
+          back. The UI says the catalog is not responding, keeps the cart in the
+          browser, and still lets the customer look up existing orders, which
+          orders serves from its own database.
+    azure:
+      container_app: ejliu-exstudents2026-orders
+      sql_database: ejliu-exstudents2026-orders-db
