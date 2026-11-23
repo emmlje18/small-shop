@@ -1,107 +1,126 @@
 # Emma's cool shop
 
-A small Flask online shop, built as one process with SQLite storage.
+A small online shop split into two Flask services, each with its own SQL Server
+database, and a static UI that calls both from the browser.
 
-## Run directly on your computer
+Live URL: <https://ejliuexstudents2026ui.z28.web.core.windows.net/>
 
-From the project root, install the dependencies and start the app:
+```
+ browser ── static UI (ui/, Azure Storage static website)
+   │  JSON over HTTPS (CORS)
+   ├──► catalog  (services/catalog)  products, options, stock, pictures, admin ──► catalog database
+   └──► orders   (services/orders)   cart pricing, checkout, orders            ──► orders database
+              │
+              └── HTTP + X-Internal-Token ──► catalog /internal/variants/{id}, /decrement, /restore
+```
+
+Orders only reaches the catalog through those three internal endpoints (the
+ADR-2 seam, now HTTP). Each service owns its tables, runs its own versioned SQL
+migrations at startup, and answers `GET /health`. The services, their
+settings and their Azure resources are described in `system.yaml`; their APIs
+in `services/<name>/openapi.yaml`. Design decisions are in `ADR.md` (6–10 for
+this assignment).
+
+## Run locally with Docker Compose
+
+Requires Docker Desktop. From the repository root:
 
 ```sh
+docker compose up --build
+```
+
+| What | URL |
+|---|---|
+| Shop (static UI) | <http://localhost:8180> |
+| Catalog API | <http://localhost:8101/health> |
+| Orders API | <http://localhost:8102/health> |
+| SQL Server (for tools) | `localhost:14330` |
+
+Compose starts one SQL Server container, a one-off `db-init` job that creates
+`catalog_db` and `orders_db` with one login each (`db/init.sql`), both
+services, and nginx serving `ui/`. Each service applies its pending migrations
+before gunicorn starts. The local admin password is `admin`; local passwords
+are defaults in `docker-compose.yml` and can be overridden with environment
+variables (`MSSQL_SA_PASSWORD`, `CATALOG_DB_PASSWORD`, `ORDERS_DB_PASSWORD`,
+`ADMIN_PASSWORD`, `INTERNAL_TOKEN`). Data is kept in the `mssql-data` volume;
+`docker compose down -v` deletes it.
+
+The shop starts with no products: sign in at **Admin** and add some. Fake
+payment: any card works except one ending in `0000`, which is declined.
+
+## Run a single service
+
+Each service starts with only the database, without the other service:
+
+```sh
+docker compose up --build catalog      # catalog + SQL Server
+docker compose up --build orders       # orders + SQL Server, no catalog
+```
+
+Orders without the catalog shows the designed partial failure: `/health` and
+`GET /orders/{id}` work, while cart and checkout answer
+`503 {"error": "The catalog is unavailable right now..."}`.
+
+To run a service outside Docker (Linux; pymssql's macOS wheel does not work on
+every Mac), start the database with `docker compose up -d mssql db-init`, then:
+
+```sh
+cd services/catalog
 python -m pip install -r requirements.txt
-python app.py
+export DATABASE_URL='mssql+pymssql://catalog_user:LocalDev_Catalog_1@localhost:14330/catalog_db'
+export ADMIN_PASSWORD=admin INTERNAL_TOKEN=local-internal-token CORS_ORIGINS=http://localhost:8180
+python -m catalog.migrate && flask --app 'catalog:create_app()' run --port 8101
 ```
 
-The app listens on `0.0.0.0` using port `8000` by default. It creates the
-SQLite database and upload directory automatically. The database is at
-`DATA_DIR/shop.db`; by default, `DATA_DIR` is `./data`.
+Every environment variable each service reads, with its default, is listed in
+`system.yaml`.
 
-Check that the app is running at <http://127.0.0.1:8000/health>.
+## Tests and coverage
 
-The admin catalog pages are at <http://127.0.0.1:8000/admin/login>. The local
-default password is `admin`; set `ADMIN_PASSWORD` before using the admin pages
-outside local development. Product images may be JPG, JPEG, PNG, GIF, or WebP,
-up to 5 MiB per request.
-
-## Configure the app
-
-| Variable | Default | Purpose |
-|---|---|---|
-| `PORT` | `8000` | Port the web app listens on. |
-| `DATA_DIR` | `./data` | Directory for `shop.db` and uploaded images. |
-| `ADMIN_PASSWORD` | `admin` | Local development password for the future admin pages. |
-| `SECRET_KEY` | `local-development-key` | Flask session signing key. |
-
-Set these in the environment when starting the app. No `.env` file is required.
-
-## Run in the provided container
-
-The root `Dockerfile` is copied from the course template. Its source-copy TODO
-includes `app/` so the image contains the Flask package as well as `app.py`.
-Build and run it from the project root:
+The tests run in a Python container against the compose SQL Server, in a
+separate `<service>_test` database that is recreated on each run:
 
 ```sh
-docker build -t small-shop .
-docker run --rm -p 8000:8000 -v small-shop-data:/data small-shop
+docker compose run --rm catalog-tests
+docker compose run --rm orders-tests
 ```
 
-In the container, `DATA_DIR` defaults to `/data`, so SQLite is stored at
-`/data/shop.db` and uploaded files at `/data/uploads`. To check a different
-port, set `PORT` and publish that same port, for example:
+Latest result: catalog 76 tests, 96% coverage; orders 46 tests, 97% coverage.
+The orders suite includes the cross-seam integration tests
+(`services/orders/tests/test_cross_seam.py`): the real orders app and its HTTP
+client against a stub catalog server that follows the catalog's OpenAPI
+document, including the catalog being stopped or too slow. CI fails below 70%
+coverage per service (ADR-9).
 
-```sh
-docker run --rm -e PORT=9000 -p 9000:9000 -v small-shop-data:/data small-shop
-```
+## How deployment works
 
-Run the copied course contract checker from the project root:
+`.github/workflows/ci.yml` runs on every push and pull request:
 
-```sh
-./container/run.sh .
-```
+1. **Validate**: `system.yaml` against `system.schema.json`, both
+   `openapi.yaml` files against the OpenAPI specification, and
+   `scripts/check_system.py` (the endpoints orders calls exist in the
+   catalog's document).
+2. **Test** (per service): ruff, then pytest with coverage against a
+   throwaway SQL Server container.
+3. **Image** (per service): Docker build; on `main` the image is pushed to
+   `ghcr.io/emmlje18/small-shop-<service>:<commit SHA>`.
+4. **Deploy** (only on a push to `main`, only if 1–3 passed on that commit):
+   signs in to Azure as the managed identity through OpenID Connect (no stored
+   Azure password), creates or updates both Container Apps with the new image
+   (min 0, max 1 replica; database URL, admin password and internal token as
+   Container Apps secrets), writes `ui/config.js` with the two service URLs,
+   uploads `ui/` to the `$web` container, and polls `/health` on both
+   services until they report the new commit SHA (up to 6 minutes, to allow for
+   a cold start and a paused database resuming).
 
-The checker requires Docker Desktop to be running.
+Changes reach `main` only through pull requests. Evidence of the
+data-preserving migration on Azure is in `docs/evidence/migration-004.md`.
 
-## Test coverage
+## Assignment 1 monolith
 
-Run the core business-logic tests and coverage report from the project root:
-
-```sh
-python3 -m pytest --cov=app.catalog.service --cov=app.catalog.repository --cov=app.orders.service --cov=app.orders.repository --cov=app.orders.payment --cov-report=term-missing
-```
-
-Latest result: **26 tests passed, 87% coverage** across the selected catalog and
-orders business-logic modules. Flask routes and templates are excluded because
-the assignment asks for unit tests of core logic rather than framework glue.
-
-## Container verification evidence
-
-The provided checker was run on 2026-10-12 and passed every check:
-
-```text
-=== SDD Assignment 1 contract check ===
-Repository: /Users/emmaliu/small-shop
-
-==> Repository shape
-  PASS  one Dockerfile, one manifest (requirements.txt)
-
-==> Build from a clean context, no build args
-  PASS  image built
-  PASS  image size 270 MB
-
-==> Start on PORT=8000 and reach it from the host
-  PASS  HTTP 200 from http://localhost:8000/
-
-==> SQLite file under DATA_DIR
-  PASS  found in /data: shop.db uploads
-
-==> Data persists, and a second boot does not re-seed
-  PASS  volume at /data persists
-  PASS  row counts unchanged across restart: order_items=0 orders=0 product_variants=0 products=0
-
-==> PORT override is honoured (not hardcoded)
-  PASS  HTTP 200 from http://localhost:9123/
-
-=== ALL CHECKS PASSED ===
-```
+The original single-process app (`app.py`, `app/`, `templates/`, `static/`,
+root `Dockerfile`, `tests/`) is kept unchanged for reference. It runs with
+`python app.py` on port 8000 with SQLite; it is not deployed.
 
 ## Azure: initial setup (done once, by hand)
 
@@ -119,8 +138,6 @@ five regions this Azure for Students subscription allows.
 | Orders database (serverless, free offer) | `ejliu-exstudents2026-orders-db` |
 | Container Apps environment (Consumption) | `ejliu-exstudents2026-env` |
 | UI storage account (static website) | `ejliuexstudents2026ui` |
-
-Live URL: <https://ejliuexstudents2026ui.z28.web.core.windows.net/>
 
 To reproduce, sign in with `az login` and run, in order:
 
@@ -141,14 +158,17 @@ az group create -n $RG -l $LOC
 az identity create -g $RG -n $PREFIX-github -l $LOC
 az identity federated-credential create -g $RG --identity-name $PREFIX-github -n github-main \
   --issuer https://token.actions.githubusercontent.com \
-  --subject repo:$REPO:ref:refs/heads/main --audiences api://AzureADTokenExchange
+  --subject 'repo:emmlje18@246001628/small-shop@1407407026:ref:refs/heads/main' \
+  --audiences api://AzureADTokenExchange
+#    GitHub's OIDC subject includes the owner and repo IDs (owner@id/repo@id);
+#    the deploy log prints the exact subject if it ever changes.
 az role assignment create --role Contributor \
   --assignee-object-id "$(az identity show -g $RG -n $PREFIX-github --query principalId -o tsv)" \
   --assignee-principal-type ServicePrincipal --scope "$(az group show -n $RG --query id -o tsv)"
 
 # 3. Passwords: generated into files outside the repository, never printed.
 mkdir -p ~/.small-shop-secrets && chmod 700 ~/.small-shop-secrets
-for f in sql-admin-password catalog-db-password orders-db-password; do
+for f in sql-admin-password catalog-db-password orders-db-password admin-password internal-token; do
   printf '%sAa1_' "$(openssl rand -base64 32 | tr -dc 'A-Za-z0-9' | head -c 24)" > ~/.small-shop-secrets/$f
 done
 
@@ -197,6 +217,8 @@ az account show --query tenantId -o tsv | gh secret set AZURE_TENANT_ID
 az account show --query id -o tsv | gh secret set AZURE_SUBSCRIPTION_ID
 gh secret set CATALOG_DB_PASSWORD < ~/.small-shop-secrets/catalog-db-password
 gh secret set ORDERS_DB_PASSWORD < ~/.small-shop-secrets/orders-db-password
+gh secret set ADMIN_PASSWORD < ~/.small-shop-secrets/admin-password
+gh secret set INTERNAL_TOKEN < ~/.small-shop-secrets/internal-token
 
 # 9. Read-only access for grading.
 az role assignment create --assignee <professor-email> --role Reader \
